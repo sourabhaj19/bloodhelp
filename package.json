@@ -1,0 +1,25 @@
+{
+  "name": "blood-donor-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"npm run start:api\" \"npm run start:web\"",
+    "start:api": "npm --prefix apps/api run start:dev",
+    "start:web": "npm --prefix apps/web run start",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "npm --prefix apps/api run build",
+    "build:web": "npm --prefix apps/web run build",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "npm --prefix apps/api run test",
+    "test:web": "npm --prefix apps/web run test"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.11.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.11.0"
+  }
+}
