@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
+import { VerifyEmailDto, VerifyMobileDto } from './dto/verify.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -157,11 +158,42 @@ export class AuthController {
     return { success: true, data: null, message: 'Password has been reset. Please login.' };
   }
 
-  // Optional verify endpoints per §4 stub
   @Public()
   @Post('verify-email')
   @HttpCode(200)
-  async verifyEmail() {
-    return { success: true, data: null, message: 'Email verification is not yet fully implemented in this phase — placeholder' };
+  @ApiOperation({ summary: 'Verify email address with token from email link' })
+  async verifyEmail(@Body() dto: VerifyEmailDto, @Req() req: Request) {
+    const data = await this.auth.verifyEmail(dto.token, getMeta(req));
+    return { success: true, data, message: 'Email verified successfully' };
+  }
+
+  @Post('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Resend email verification link' })
+  async resendVerification(@CurrentUser() user: JwtPayload, @Req() req: Request) {
+    const data = await this.auth.requestEmailVerification(user.sub, getMeta(req));
+    return { success: true, data, message: 'Verification email sent' };
+  }
+
+  @Post('send-mobile-otp')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Send 6-digit mobile verification OTP by SMS' })
+  async sendMobileOtp(@CurrentUser() user: JwtPayload, @Req() req: Request) {
+    const data = await this.auth.sendMobileOtp(user.sub, getMeta(req));
+    return { success: true, data, message: 'Verification code sent' };
+  }
+
+  @Post('verify-mobile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Verify mobile number with OTP' })
+  async verifyMobile(@CurrentUser() user: JwtPayload, @Body() dto: VerifyMobileDto, @Req() req: Request) {
+    const data = await this.auth.verifyMobileOtp(user.sub, dto.otp, getMeta(req));
+    return { success: true, data, message: 'Mobile verified successfully' };
   }
 }

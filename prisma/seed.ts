@@ -153,6 +153,14 @@ async function main() {
       textBody: 'Hi {{firstName}},\n\nThanks for joining BloodHelp — every donation can save up to three lives.\n\nFind requests near you: {{appUrl}}/search\n\n— The BloodHelp team',
     },
     {
+      code: 'EMAIL_VERIFICATION',
+      name: 'Verify your email',
+      notificationType: 'EMAIL_VERIFICATION',
+      subject: 'Verify your BloodHelp email, {{firstName}}',
+      htmlBody: '<p>Hi {{firstName}},</p><p>Welcome to <strong>BloodHelp</strong>! Please verify your email address by clicking below (valid for 24 hours):</p><p><a href="{{verifyLink}}">Verify my email</a></p><p>If you did not create this account, you can ignore this email.</p>',
+      textBody: 'Hi {{firstName}},\n\nWelcome to BloodHelp! Verify your email (valid 24 hours): {{verifyLink}}\n\nIf you did not create this account, ignore this email.',
+    },
+    {
       code: 'PASSWORD_RESET',
       name: 'Password reset link',
       notificationType: 'PASSWORD_RESET',

@@ -33,6 +33,8 @@ export function renderString(source: string, vars: TemplateVars, escape: boolean
 export function sampleVarsFor(type: string | null, appUrl: string): TemplateVars {
   const base = { appUrl };
   switch (type) {
+    case 'EMAIL_VERIFICATION':
+      return { ...base, firstName: 'Alex', verifyLink: `${appUrl}/verify-email?token=SAMPLE` };
     case 'PASSWORD_RESET':
       return { ...base, firstName: 'Alex', resetLink: `${appUrl}/reset-password?token=SAMPLE` };
     case 'REPORT_CREATED':

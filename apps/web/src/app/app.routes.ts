@@ -65,6 +65,13 @@ export const routes: Routes = [
             (m) => m.ResetPasswordComponent,
           ),
       },
+      {
+        path: 'verify-email',
+        loadComponent: () =>
+          import('./features/auth/verify-email.component').then(
+            (m) => m.VerifyEmailComponent,
+          ),
+      },
     ],
   },
 

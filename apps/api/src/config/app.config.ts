@@ -25,6 +25,7 @@ export default registerAs('app', () => ({
     provider: process.env.EMAIL_PROVIDER || 'smtp',
     from: process.env.EMAIL_FROM || 'no-reply@example.com',
     supportEmail: process.env.SUPPORT_EMAIL || process.env.EMAIL_FROM || 'no-reply@example.com',
+    verificationExpiresIn: process.env.EMAIL_VERIFICATION_EXPIRES_IN || '24h',
     smtp: {
       host: process.env.SMTP_HOST || '',
       port: parseInt(process.env.SMTP_PORT || '587', 10),
@@ -42,5 +43,15 @@ export default registerAs('app', () => ({
     provider: process.env.GEOCODING_PROVIDER || '',
     baseUrl: process.env.GEOCODING_BASE_URL || '',
     apiKey: process.env.GEOCODING_API_KEY || '',
+  },
+  sms: {
+    // 'log' prints OTPs to server logs (dev). Plug a real provider (Twilio/MSG91/…) here later.
+    provider: process.env.SMS_PROVIDER || 'log',
+    from: process.env.SMS_FROM || 'BloodHelp',
+  },
+  otp: {
+    mobileExpiresIn: process.env.MOBILE_OTP_EXPIRES_IN || '10m',
+    maxAttempts: parseInt(process.env.MOBILE_OTP_MAX_ATTEMPTS || '5', 10),
+    pepper: process.env.MOBILE_OTP_PEPPER || 'dev-pepper-change-me',
   },
 }));

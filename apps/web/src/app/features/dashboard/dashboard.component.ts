@@ -34,6 +34,12 @@ interface DashboardData {
       </div>
     </div>
 
+    <div *ngIf="needsVerification()" class="verify-banner mb-3">
+      <i class="pi pi-exclamation-triangle"></i>
+      <span>{{ verificationHint() }}</span>
+      <a routerLink="/profile" class="link">Verify now</a>
+    </div>
+
     <!-- Error state -->
     <p-message *ngIf="!loading && error" severity="error" styleClass="w-full mb-3"></p-message>
     <div *ngIf="!loading && error" class="flex align-items-center gap-2 mb-4">
@@ -129,6 +135,14 @@ interface DashboardData {
       .stat-icon.big { width: 48px; height: 48px; font-size: 1.4rem; }
       .muted { color: #667085; }
       .err-text { color: #b42318; font-weight: 600; }
+      .verify-banner {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        background: #fffaeb; border: 1px solid #fedf89; color: #93370d;
+        border-radius: 12px; padding: 12px 16px; font-weight: 600;
+      }
+      .verify-banner .pi { color: #dc6803; }
+      .verify-banner .link { color: #b42318; font-weight: 800; margin-left: auto; }
+      .verify-banner .link:hover { text-decoration: underline; }
     `,
   ],
 })
@@ -141,9 +155,30 @@ export class DashboardComponent implements OnInit {
   data: DashboardData | null = null;
   loading = true;
   error = '';
+  emailVerified = true;
+  mobileVerified = true;
 
   ngOnInit() {
     this.load();
+    this.http.get<any>('/api/users/me').subscribe({
+      next: (r) => {
+        const me = r.data ?? r;
+        this.emailVerified = me?.emailVerified !== false;
+        this.mobileVerified = me?.mobileVerified !== false;
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
+  needsVerification(): boolean {
+    return !this.emailVerified || !this.mobileVerified;
+  }
+
+  verificationHint(): string {
+    if (!this.emailVerified && !this.mobileVerified) return 'Your email and mobile are unverified.';
+    if (!this.emailVerified) return 'Your email is unverified.';
+    return 'Your mobile number is unverified.';
   }
 
   go(url: string) {

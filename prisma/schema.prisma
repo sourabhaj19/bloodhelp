@@ -223,6 +223,7 @@ model User {
   refreshTokens         RefreshToken[]
   passwordResetTokens   PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  mobileVerificationOtps MobileVerificationOtp[]
   notifications         Notification[]
   loginHistory          LoginHistory[]
   securityEvents        SecurityEvent[]
@@ -303,6 +304,23 @@ model EmailVerificationToken {
 
   @@index([userId])
   @@map("email_verification_tokens")
+}
+
+model MobileVerificationOtp {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id") @db.VarChar(36)
+  mobile    String    @map("mobile") @db.VarChar(20)
+  otpHash   String    @map("otp_hash") @db.VarChar(255)
+  attempts  Int       @default(0)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("mobile_verification_otps")
 }
 
 // ────────────────────────────────────────────────────────────

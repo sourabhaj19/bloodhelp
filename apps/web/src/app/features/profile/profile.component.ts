@@ -69,6 +69,46 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         </div>
       </p-card>
 
+      <p-card *ngIf="!loading && profile" header="Verification" subheader="Verified contact details keep the community trustworthy" styleClass="mt-3">
+        <div class="flex flex-column gap-3">
+          <div class="flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div>
+              <div class="font-bold">Email</div>
+              <div class="muted text-sm">{{ profile.email }}</div>
+            </div>
+            <div class="flex align-items-center gap-2">
+              <p-tag *ngIf="profile.emailVerified" value="Verified" severity="success" icon="pi pi-check"></p-tag>
+              <p-button *ngIf="!profile.emailVerified" label="Send verification link" size="small" severity="secondary" [outlined]="true" (onClick)="resendEmail()" [loading]="emailSending"></p-button>
+            </div>
+          </div>
+          <p-divider styleClass="m-0"></p-divider>
+          <div class="flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div>
+              <div class="font-bold">Mobile</div>
+              <div class="muted text-sm">{{ profile.mobile }}</div>
+            </div>
+            <div class="flex align-items-center gap-2">
+              <p-tag *ngIf="profile.mobileVerified" value="Verified" severity="success" icon="pi pi-check"></p-tag>
+              <p-button *ngIf="!profile.mobileVerified" label="Verify via SMS" icon="pi pi-mobile" size="small" severity="secondary" [outlined]="true" (onClick)="sendOtp()"></p-button>
+            </div>
+          </div>
+        </div>
+      </p-card>
+
+      <p-dialog [(visible)]="otpDialog" header="Enter verification code" [modal]="true" [style]="{ width: 'min(400px, 94vw)' }">
+        <p class="mt-0">We sent a 6-digit code to <strong>{{ profile?.mobile }}</strong>. It expires in 10 minutes.</p>
+        <p-message *ngIf="devOtp" severity="info" [text]="'Dev mode — your code is ' + devOtp" styleClass="w-full mb-3"></p-message>
+        <p-message *ngIf="otpError" severity="error" [text]="otpError" styleClass="w-full mb-3"></p-message>
+        <div class="field mb-0">
+          <label for="otp">6-digit code</label>
+          <input pInputText id="otp" [(ngModel)]="otp" maxlength="6" inputmode="numeric" class="w-full otp-input" placeholder="••••••" autocomplete="one-time-code" />
+        </div>
+        <div class="flex align-items-center justify-content-between mt-3">
+          <p-button label="Resend code" severity="secondary" [text]="true" size="small" (onClick)="sendOtp()"></p-button>
+          <p-button label="Verify" icon="pi pi-check" (onClick)="confirmOtp()" [loading]="otpVerifying" [disabled]="otp.trim().length !== 6"></p-button>
+        </div>
+      </p-dialog>
+
       <p-card *ngIf="!loading && profile" header="Security" subheader="Changing your password logs out all other devices" styleClass="mt-3">
         <p-message *ngIf="pwError" severity="error" [text]="pwError" styleClass="w-full mb-3"></p-message>
         <p-message *ngIf="pwMismatch" severity="warn" text="New passwords do not match." styleClass="w-full mb-3"></p-message>
@@ -98,6 +138,8 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       .page-title { margin: 0; font-size: 1.9rem; letter-spacing: -0.02em; }
       .page-sub { margin: 0.2rem 0 1rem; color: #667085; }
       .field label { display: block; margin-bottom: 0.4rem; }
+      .muted { color: #667085; }
+      .otp-input { letter-spacing: 0.5em; text-align: center; font-size: 1.3rem; font-weight: 700; }
     `,
   ],
 })
@@ -112,6 +154,13 @@ export class ProfileComponent implements OnInit {
   pwError = '';
   pwMismatch = false;
 
+  emailSending = false;
+  otpDialog = false;
+  otp = '';
+  otpError = '';
+  otpVerifying = false;
+  devOtp = '';
+
   profile: any = null;
   loading = true;
   saving = false;
@@ -119,6 +168,10 @@ export class ProfileComponent implements OnInit {
   error = '';
 
   ngOnInit() {
+    this.loadProfile();
+  }
+
+  loadProfile() {
     this.http.get<any>('/api/users/me').subscribe({
       next: (r) => { this.profile = r.data ?? r; this.loading = false; this.cdr.markForCheck(); },
       error: (e) => {
@@ -128,6 +181,53 @@ export class ProfileComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  async resendEmail() {
+    this.emailSending = true;
+    try {
+      await this.auth.resendVerification();
+      this.errors.showSuccess('Verification link sent — check your inbox.');
+    } catch (e: any) {
+      this.errors.handleHttpError(e, 'Failed to send verification email');
+    } finally {
+      this.emailSending = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async sendOtp() {
+    this.otpError = '';
+    try {
+      const res: any = await this.auth.sendMobileOtp();
+      const data = res?.data ?? res;
+      this.devOtp = data?.devOtp || '';
+      this.otp = '';
+      this.otpDialog = true;
+      if (!this.devOtp) this.errors.showInfo('Code sent by SMS.');
+    } catch (e: any) {
+      this.errors.handleHttpError(e, 'Failed to send code');
+    } finally {
+      this.cdr.markForCheck();
+    }
+  }
+
+  async confirmOtp() {
+    if (this.otp.trim().length !== 6) return;
+    this.otpError = '';
+    this.otpVerifying = true;
+    try {
+      await this.auth.verifyMobile(this.otp.trim());
+      this.otpDialog = false;
+      this.devOtp = '';
+      this.errors.showSuccess('Mobile number verified.');
+      this.loadProfile();
+    } catch (e: any) {
+      this.otpError = this.errors.getUserMessage(e);
+    } finally {
+      this.otpVerifying = false;
+      this.cdr.markForCheck();
+    }
   }
 
   useMyLocation() {

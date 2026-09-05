@@ -99,6 +99,22 @@ export class AuthService {
     return data?.accessToken ?? null;
   }
 
+  async verifyEmail(token: string) {
+    return firstValueFrom(this.http.post('/api/auth/verify-email', { token }, { withCredentials: true }));
+  }
+
+  async resendVerification() {
+    return firstValueFrom(this.http.post('/api/auth/resend-verification', {}, { withCredentials: true }));
+  }
+
+  async sendMobileOtp(): Promise<any> {
+    return firstValueFrom(this.http.post('/api/auth/send-mobile-otp', {}, { withCredentials: true }));
+  }
+
+  async verifyMobile(otp: string) {
+    return firstValueFrom(this.http.post('/api/auth/verify-mobile', { otp }, { withCredentials: true }));
+  }
+
   async forgotPassword(email: string) {
     return firstValueFrom(this.http.post('/api/auth/forgot-password', { email }, { withCredentials: true }));
   }

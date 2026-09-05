@@ -21,8 +21,10 @@ import {
   randomToken,
   randomFamilyId,
 } from '../common/utils/hash';
+import { randomInt, timingSafeEqual } from 'crypto';
 import { getPasswordPolicy, validatePasswordPolicy } from '../common/utils/password-policy';
 import { EmailTemplateService } from '../mail/email-template.service';
+import { SmsService } from '../mail/sms.service';
 
 @Injectable()
 export class AuthService {
@@ -33,7 +35,27 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly templates: EmailTemplateService,
+    private readonly sms: SmsService,
   ) {}
+
+  private emailVerificationExpiresInMs(): number {
+    return this.parseDurationMs(
+      this.config.get<string>('app.email.verificationExpiresIn', '24h')!,
+      24 * 60 * 60 * 1000,
+    );
+  }
+
+  private mobileOtpExpiresInMs(): number {
+    return this.parseDurationMs(
+      this.config.get<string>('app.otp.mobileExpiresIn', '10m')!,
+      10 * 60 * 1000,
+    );
+  }
+
+  private otpHash(otp: string, userId: string): string {
+    const pepper = this.config.get<string>('app.otp.pepper', 'dev-pepper-change-me')!;
+    return sha256(`${otp}:${userId}:${pepper}`);
+  }
 
   private appUrl(): string {
     return this.config.get<string>('app.frontendUrl', 'http://localhost:4200')!;
@@ -153,9 +175,133 @@ export class AuthService {
     const accessToken = this.signAccessToken(user);
     const { refreshToken, familyId } = await this.createRefreshToken(user.id, meta);
 
-    void this.templates.sendForType('WELCOME', user.email, { firstName: user.firstName });
+    // Welcome email goes out on verification — here we send the verify link
+    await this.requestEmailVerification(user.id, meta);
 
     return { user: this.toPublicUser(user), accessToken, refreshToken, familyId };
+  }
+
+  /** Create a fresh verification token + mail the link. Safe to call repeatedly. */
+  async requestEmailVerification(userId: string, meta: { ip?: string; userAgent?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    if (user.emailVerified) throw new BadRequestException({ code: 'EMAIL_ALREADY_VERIFIED', message: 'Email is already verified' });
+
+    await this.prisma.emailVerificationToken.updateMany({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    const raw = randomToken(32);
+    const expiresAt = new Date(Date.now() + this.emailVerificationExpiresInMs());
+    await this.prisma.emailVerificationToken.create({
+      data: { userId: user.id, tokenHash: sha256(raw), expiresAt },
+    });
+    void this.templates.sendForType('EMAIL_VERIFICATION', user.email, {
+      firstName: user.firstName,
+      verifyLink: `${this.appUrl()}/verify-email?token=${raw}`,
+    });
+    await this.prisma.securityEvent.create({
+      data: { userId: user.id, type: 'EMAIL_CHANGED', ipAddress: meta.ip, userAgent: meta.userAgent, metadata: { result: 'verification-sent' } as any },
+    });
+    return { sent: true };
+  }
+
+  async verifyEmail(token: string, meta: { ip?: string; userAgent?: string }) {
+    const tokenHash = sha256(token);
+    const row = await this.prisma.emailVerificationToken.findUnique({ where: { tokenHash } });
+    if (!row) throw new BadRequestException({ code: 'VERIFY_TOKEN_INVALID', message: 'Invalid verification link' });
+    if (row.usedAt) throw new BadRequestException({ code: 'VERIFY_TOKEN_USED', message: 'This verification link was already used' });
+    if (row.expiresAt < new Date()) throw new BadRequestException({ code: 'VERIFY_TOKEN_EXPIRED', message: 'This verification link has expired — request a new one' });
+
+    const user = await this.prisma.user.findUnique({ where: { id: row.userId } });
+    if (!user || user.deletedAt) throw new BadRequestException({ code: 'VERIFY_TOKEN_INVALID', message: 'Invalid verification link' });
+
+    const data: any = { emailVerified: true };
+    // Support email-change verifications: adopt the pending address once proven
+    if (row.newEmail && row.newEmail.toLowerCase() !== user.email) {
+      const clash = await this.prisma.user.findUnique({ where: { email: row.newEmail.toLowerCase() } });
+      if (clash) throw new ConflictException({ code: 'USER_EMAIL_EXISTS', message: 'Email already registered' });
+      data.email = row.newEmail.toLowerCase();
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data });
+      await tx.emailVerificationToken.update({ where: { id: row.id }, data: { usedAt: new Date() } });
+      await tx.auditLog.create({
+        data: { actorUserId: user.id, action: 'UPDATE', entityType: 'User', entityId: user.id, newValue: { emailVerified: true } as any, ipAddress: meta.ip, userAgent: meta.userAgent },
+      });
+      await tx.notification.create({
+        data: { userId: user.id, type: 'ADMIN_ANNOUNCEMENT', title: 'Email verified', message: 'Your email address has been verified. Thank you for helping keep BloodHelp trustworthy.' },
+      });
+    });
+
+    void this.templates.sendForType('WELCOME', data.email ?? user.email, { firstName: user.firstName });
+    return { verified: true };
+  }
+
+  async sendMobileOtp(userId: string, meta: { ip?: string; userAgent?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    if (user.mobileVerified) throw new BadRequestException({ code: 'MOBILE_ALREADY_VERIFIED', message: 'Mobile number is already verified' });
+
+    await this.prisma.mobileVerificationOtp.updateMany({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    const otp = String(randomInt(100000, 1000000));
+    const expiresAt = new Date(Date.now() + this.mobileOtpExpiresInMs());
+    await this.prisma.mobileVerificationOtp.create({
+      data: { userId: user.id, mobile: user.mobile, otpHash: this.otpHash(otp, user.id), expiresAt },
+    });
+    const result = await this.sms.sendSms(user.mobile, `BloodHelp: your verification code is ${otp}. Valid for 10 minutes.`);
+    await this.prisma.securityEvent.create({
+      data: { userId: user.id, type: 'MOBILE_CHANGED', ipAddress: meta.ip, userAgent: meta.userAgent, metadata: { result: 'otp-sent' } as any },
+    });
+    // Dev/E2E helper mirroring the password-reset devToken pattern
+    return { sent: true, smsSkipped: result.skipped, devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined };
+  }
+
+  async verifyMobileOtp(userId: string, otp: string, meta: { ip?: string; userAgent?: string }) {
+    const maxAttempts = this.config.get<number>('app.otp.maxAttempts', 5)!;
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    if (user.mobileVerified) throw new BadRequestException({ code: 'MOBILE_ALREADY_VERIFIED', message: 'Mobile number is already verified' });
+
+    const row = await this.prisma.mobileVerificationOtp.findFirst({
+      where: { userId: user.id, mobile: user.mobile, usedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!row) throw new BadRequestException({ code: 'OTP_NOT_FOUND', message: 'No active code — request a new one' });
+    if (row.expiresAt < new Date()) throw new BadRequestException({ code: 'OTP_EXPIRED', message: 'Code expired — request a new one' });
+    if (row.attempts >= maxAttempts) {
+      await this.prisma.mobileVerificationOtp.update({ where: { id: row.id }, data: { usedAt: new Date() } });
+      throw new BadRequestException({ code: 'OTP_LOCKED', message: 'Too many wrong attempts — request a new code' });
+    }
+
+    const candidate = Buffer.from(this.otpHash(otp, user.id));
+    const expected = Buffer.from(row.otpHash);
+    const match = candidate.length === expected.length && timingSafeEqual(candidate, expected);
+    if (!match) {
+      const attempts = row.attempts + 1;
+      await this.prisma.mobileVerificationOtp.update({
+        where: { id: row.id },
+        data: { attempts, ...(attempts >= maxAttempts ? { usedAt: new Date() } : {}) },
+      });
+      const left = Math.max(0, maxAttempts - attempts);
+      throw new BadRequestException({ code: 'OTP_INVALID', message: left > 0 ? `Incorrect code — ${left} attempt(s) left` : 'Too many wrong attempts — request a new code' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { mobileVerified: true } });
+      await tx.mobileVerificationOtp.update({ where: { id: row.id }, data: { usedAt: new Date() } });
+      await tx.auditLog.create({
+        data: { actorUserId: user.id, action: 'UPDATE', entityType: 'User', entityId: user.id, newValue: { mobileVerified: true } as any, ipAddress: meta.ip, userAgent: meta.userAgent },
+      });
+      await tx.notification.create({
+        data: { userId: user.id, type: 'ADMIN_ANNOUNCEMENT', title: 'Mobile verified', message: 'Your mobile number has been verified.' },
+      });
+    });
+    return { verified: true };
   }
 
   async login(dto: LoginDto, meta: { ip?: string; userAgent?: string }) {
