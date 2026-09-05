@@ -5,10 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { EmailTemplateService } from '../mail/email-template.service';
 
 @Injectable()
 export class AppreciationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly templates: EmailTemplateService,
+  ) {}
 
   async give(senderUserId: string, receiverUserId: string, message?: string) {
     if (senderUserId === receiverUserId) {
@@ -43,6 +47,11 @@ export class AppreciationsService {
         referenceType: 'APPRECIATION',
         referenceId: appreciation.id,
       },
+    });
+    void this.templates.sendForType('APPRECIATION_RECEIVED', receiver.email, {
+      firstName: receiver.firstName,
+      senderName: `${sender?.firstName ?? 'Someone'} ${sender?.lastName ?? ''}`.trim(),
+      message: message || '',
     });
 
     return appreciation;

@@ -22,6 +22,7 @@ import {
   randomFamilyId,
 } from '../common/utils/hash';
 import { getPasswordPolicy, validatePasswordPolicy } from '../common/utils/password-policy';
+import { EmailTemplateService } from '../mail/email-template.service';
 
 @Injectable()
 export class AuthService {
@@ -31,7 +32,12 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly templates: EmailTemplateService,
   ) {}
+
+  private appUrl(): string {
+    return this.config.get<string>('app.frontendUrl', 'http://localhost:4200')!;
+  }
 
   private accessExpiresIn(): string {
     return this.config.get<string>('app.jwt.accessExpiresIn', '15m')!;
@@ -146,6 +152,8 @@ export class AuthService {
     // Issue tokens
     const accessToken = this.signAccessToken(user);
     const { refreshToken, familyId } = await this.createRefreshToken(user.id, meta);
+
+    void this.templates.sendForType('WELCOME', user.email, { firstName: user.firstName });
 
     return { user: this.toPublicUser(user), accessToken, refreshToken, familyId };
   }
@@ -336,6 +344,10 @@ export class AuthService {
       await this.prisma.securityEvent.create({
         data: { userId: user.id, type: 'PASSWORD_RESET_REQUESTED', ipAddress: meta.ip, userAgent: meta.userAgent },
       });
+      void this.templates.sendForType('PASSWORD_RESET', user.email, {
+        firstName: user.firstName,
+        resetLink: `${this.appUrl()}/reset-password?token=${raw}`,
+      });
       // In production: enqueue email via BullMQ -> EmailService
       // For this implementation we log token (never in production logs with PII redaction, but dev helper)
       this.logger.log(`Password reset token for ${user.email}: ${raw} (expires ${expiresAt.toISOString()}) — in production this is emailed`);
@@ -392,6 +404,8 @@ export class AuthService {
       });
     });
 
+    void this.templates.sendForType('PASSWORD_CHANGED', user.email, { firstName: user.firstName });
+
     return { success: true };
   }
 
@@ -445,6 +459,8 @@ export class AuthService {
         },
       });
     });
+
+    void this.templates.sendForType('PASSWORD_CHANGED', user.email, { firstName: user.firstName });
 
     const accessToken = this.signAccessToken(user);
     const { refreshToken } = await this.createRefreshToken(user.id, meta, ttlMs);

@@ -141,6 +141,84 @@ async function main() {
   }
   console.log('  ReportReasons seeded');
 
+  // Email templates — variables use {{name}} placeholders; admin can edit
+  // subject/bodies and re-map notificationType in the admin UI afterwards.
+  const emailTemplates = [
+    {
+      code: 'WELCOME',
+      name: 'Welcome new donor',
+      notificationType: 'WELCOME',
+      subject: 'Welcome to BloodHelp, {{firstName}}!',
+      htmlBody: '<p>Hi {{firstName}},</p><p>Thanks for joining <strong>BloodHelp</strong> — every donation can save up to three lives.</p><p><a href="{{appUrl}}/search">Find donation requests near you</a>.</p><p>— The BloodHelp team</p>',
+      textBody: 'Hi {{firstName}},\n\nThanks for joining BloodHelp — every donation can save up to three lives.\n\nFind requests near you: {{appUrl}}/search\n\n— The BloodHelp team',
+    },
+    {
+      code: 'PASSWORD_RESET',
+      name: 'Password reset link',
+      notificationType: 'PASSWORD_RESET',
+      subject: 'Reset your BloodHelp password',
+      htmlBody: '<p>Hi {{firstName}},</p><p>We received a password reset request for your account. Click below (valid for 30 minutes):</p><p><a href="{{resetLink}}">Reset my password</a></p><p>If you did not ask for this, you can ignore this email.</p>',
+      textBody: 'Hi {{firstName}},\n\nReset your password (valid 30 minutes): {{resetLink}}\n\nIf you did not ask for this, ignore this email.',
+    },
+    {
+      code: 'PASSWORD_CHANGED',
+      name: 'Password changed notice',
+      notificationType: 'PASSWORD_CHANGED',
+      subject: 'Your BloodHelp password was changed',
+      htmlBody: '<p>Hi {{firstName}},</p><p>Your password was just changed. All other devices were logged out.</p><p>If this was not you, reset your password immediately via <a href="{{appUrl}}/forgot-password">forgot password</a> and contact support.</p>',
+      textBody: 'Hi {{firstName}},\n\nYour password was just changed. All other devices were logged out.\n\nIf this was not you, reset it immediately: {{appUrl}}/forgot-password',
+    },
+    {
+      code: 'REPORT_CREATED_ADMIN',
+      name: 'New report filed (to admins)',
+      notificationType: 'REPORT_CREATED',
+      subject: 'New user report needs review',
+      htmlBody: '<p>A new report was filed against <strong>{{reportedName}}</strong> ({{reportedEmail}}).</p><p>Reason: {{reasonLabel}}</p><p>Review it in the <a href="{{appUrl}}/admin/reports?reportId={{reportId}}">admin triage board</a>.</p>',
+      textBody: 'A new report was filed against {{reportedName}} ({{reportedEmail}}).\nReason: {{reasonLabel}}\nReview: {{appUrl}}/admin/reports?reportId={{reportId}}',
+    },
+    {
+      code: 'REPORT_STATUS_CHANGED',
+      name: 'Report status update (to reporter)',
+      notificationType: 'REPORT_STATUS_CHANGED',
+      subject: 'Update on your BloodHelp report',
+      htmlBody: '<p>Hi {{firstName}},</p><p>Your report against <strong>{{reportedName}}</strong> is now <strong>{{statusLabel}}</strong>.</p><p><a href="{{appUrl}}/reports?reportId={{reportId}}">View your report</a></p>',
+      textBody: 'Hi {{firstName}},\n\nYour report against {{reportedName}} is now {{statusLabel}}.\nView: {{appUrl}}/reports?reportId={{reportId}}',
+    },
+    {
+      code: 'APPRECIATION_RECEIVED',
+      name: 'You received thanks',
+      notificationType: 'APPRECIATION_RECEIVED',
+      subject: '{{senderName}} thanked you on BloodHelp',
+      htmlBody: '<p>Hi {{firstName}},</p><p><strong>{{senderName}}</strong> thanked you: “{{message}}”.</p><p><a href="{{appUrl}}/appreciations">See your appreciations</a></p>',
+      textBody: 'Hi {{firstName}},\n\n{{senderName}} thanked you: "{{message}}".\nSee: {{appUrl}}/appreciations',
+    },
+    {
+      code: 'CONTACT_TO_SUPPORT',
+      name: 'Contact form (to support)',
+      notificationType: 'CONTACT_MESSAGE',
+      subject: '[BloodHelp contact] {{subject}} — {{name}}',
+      htmlBody: '<p>New contact message from <strong>{{name}}</strong> ({{email}}).</p><p>Subject: {{subject}}</p><p>{{message}}</p>',
+      textBody: 'New contact message from {{name}} ({{email}}).\nSubject: {{subject}}\n\n{{message}}',
+    },
+    {
+      code: 'CONTACT_CONFIRMATION',
+      name: 'Contact confirmation (to sender)',
+      notificationType: 'CONTACT_CONFIRMATION',
+      subject: 'We received your message — BloodHelp',
+      htmlBody: '<p>Hi {{name}},</p><p>Thanks for reaching out about “{{subject}}”. We usually reply within 2 working days.</p><p>— The BloodHelp team</p>',
+      textBody: 'Hi {{name}},\n\nThanks for reaching out about "{{subject}}". We usually reply within 2 working days.\n\n— The BloodHelp team',
+    },
+  ];
+  for (const t of emailTemplates) {
+    await prisma.emailTemplate.upsert({
+      where: { code: t.code },
+      // Never overwrite admin customizations on re-seed — only fill new rows
+      update: {},
+      create: t,
+    });
+  }
+  console.log('  EmailTemplates seeded');
+
   // Admin user (for Phase 4 / Phase 9 demo) — credentials: admin@bloodhelp.local / Admin!12345678
   // Password policy min 12, so 14 chars with upper/lower/number/special
   try {

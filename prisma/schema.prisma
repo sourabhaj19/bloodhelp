@@ -2,6 +2,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Second client copy for apps/api, which resolves @prisma/client from its own
+// node_modules. Keeps both in sync on every `prisma generate`.
+generator apiClient {
+  provider = "prisma-client-js"
+  output   = "../apps/api/node_modules/.prisma/client"
+}
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -149,6 +156,23 @@ model ReportReason {
   reports UserReport[]
 
   @@map("report_reasons")
+}
+
+model EmailTemplate {
+  id               String   @id @default(uuid())
+  code             String   @unique @db.VarChar(50) // stable key, e.g. PASSWORD_RESET
+  name             String   @db.VarChar(100)
+  subject          String   @db.VarChar(255) // supports {{placeholders}}
+  htmlBody         String   @db.Text // supports {{placeholders}}
+  textBody         String?  @db.Text
+  // When set, this template is used for that in-app notification type.
+  // Unique → one template per type; null → unmapped reusable template.
+  notificationType String?  @unique @map("notification_type") @db.VarChar(50)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("email_templates")
 }
 
 // ────────────────────────────────────────────────────────────

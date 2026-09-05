@@ -13,6 +13,8 @@ import { MasterDataModule } from './master-data/master-data.module';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
+import { MailModule } from './mail/mail.module';
+import { ContactModule } from './contact/contact.module';
 import appConfig from './config/app.config';
 
 @Module({
@@ -31,6 +33,8 @@ import appConfig from './config/app.config';
     AdminModule,
     AuditModule,
     GeocodingModule,
+    MailModule,
+    ContactModule,
   ],
 })
 export class AppModule {}

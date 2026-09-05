@@ -20,6 +20,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/admin/dashboard" routerLinkActive="active">Dashboard</a>
         <a routerLink="/admin/users" routerLinkActive="active">Users</a>
         <a routerLink="/admin/reports" routerLinkActive="active">Reports</a>
+        <a routerLink="/admin/email-templates" routerLinkActive="active">Emails</a>
         <button type="button" class="nav-drop" [class.active]="isMasterData" (click)="mdMenu.toggle($event)">
           Master data <i class="pi pi-chevron-down ml-1"></i>
         </button>
@@ -38,6 +39,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/admin/dashboard" routerLinkActive="active" (click)="sidebar = false" class="side-link">Dashboard</a>
         <a routerLink="/admin/users" routerLinkActive="active" (click)="sidebar = false" class="side-link">Users</a>
         <a routerLink="/admin/reports" routerLinkActive="active" (click)="sidebar = false" class="side-link">Reports</a>
+        <a routerLink="/admin/email-templates" routerLinkActive="active" (click)="sidebar = false" class="side-link">Email templates</a>
         <a routerLink="/admin/master-data/blood-groups" routerLinkActive="active" (click)="sidebar = false" class="side-link">Blood groups</a>
         <a routerLink="/admin/master-data/countries" routerLinkActive="active" (click)="sidebar = false" class="side-link">Countries</a>
         <a routerLink="/admin/master-data/country-codes" routerLinkActive="active" (click)="sidebar = false" class="side-link">Country codes</a>

@@ -44,10 +44,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
-    // Never leak internal messages in production for 500s
+    // Never leak internal messages in production for 500s — but in
+    // development return the real message so API errors are diagnosable
+    // without digging through server logs.
     if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
-      message = 'An unexpected error occurred';
       code = 'INTERNAL_ERROR';
+      if (process.env.NODE_ENV !== 'production' && exception instanceof Error && exception.message) {
+        message = exception.message;
+      } else {
+        message = 'An unexpected error occurred';
+      }
     }
 
     response.status(status).json({

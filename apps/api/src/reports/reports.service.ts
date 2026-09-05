@@ -5,10 +5,14 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { EmailTemplateService } from '../mail/email-template.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly templates: EmailTemplateService,
+  ) {}
 
   async create(reporterId: string, reportedUserId: string, reasonId: string, description?: string) {
     if (reporterId === reportedUserId) {
@@ -33,7 +37,10 @@ export class ReportsService {
     });
 
     // Notify admins via notification (for each admin)
-    const admins = await this.prisma.user.findMany({ where: { role: 'ADMIN', active: true, deletedAt: null }, select: { id: true } });
+    const admins = await this.prisma.user.findMany({
+      where: { role: 'ADMIN', active: true, deletedAt: null },
+      select: { id: true, email: true },
+    });
     for (const admin of admins) {
       await this.prisma.notification.create({
         data: {
@@ -44,6 +51,12 @@ export class ReportsService {
           referenceType: 'REPORT',
           referenceId: report.id,
         },
+      });
+      void this.templates.sendForType('REPORT_CREATED', admin.email, {
+        reportedName: `${reportedUser.firstName} ${reportedUser.lastName}`,
+        reportedEmail: reportedUser.email,
+        reasonLabel: reason.label,
+        reportId: report.id,
       });
     }
 
@@ -174,6 +187,18 @@ export class ReportsService {
         referenceId: id,
       },
     });
+    const [reporter, reported] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: existing.reportedByUserId }, select: { email: true, firstName: true } }),
+      this.prisma.user.findUnique({ where: { id: existing.reportedUserId }, select: { firstName: true, lastName: true } }),
+    ]);
+    if (reporter) {
+      void this.templates.sendForType('REPORT_STATUS_CHANGED', reporter.email, {
+        firstName: reporter.firstName,
+        reportedName: `${reported?.firstName ?? ''} ${reported?.lastName ?? ''}`.trim(),
+        statusLabel: status === 'UNDER_REVIEW' ? 'Under review' : status.charAt(0) + status.slice(1).toLowerCase(),
+        reportId: id,
+      });
+    }
     return updated;
   }
 }

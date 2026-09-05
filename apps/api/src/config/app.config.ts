@@ -21,6 +21,18 @@ export default registerAs('app', () => ({
     requireNumber: process.env.PASSWORD_REQUIRE_NUMBER !== 'false',
     requireSpecial: process.env.PASSWORD_REQUIRE_SPECIAL_CHARACTER !== 'false',
   },
+  email: {
+    provider: process.env.EMAIL_PROVIDER || 'smtp',
+    from: process.env.EMAIL_FROM || 'no-reply@example.com',
+    supportEmail: process.env.SUPPORT_EMAIL || process.env.EMAIL_FROM || 'no-reply@example.com',
+    smtp: {
+      host: process.env.SMTP_HOST || '',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USERNAME || '',
+      pass: process.env.SMTP_PASSWORD || '',
+    },
+  },
   map: {
     tileProvider: process.env.MAP_TILE_PROVIDER || 'osm',
     tileUrl: process.env.MAP_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',

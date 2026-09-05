@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
   Req,
   UseGuards,
@@ -20,6 +21,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
 import { AdminUpdateUserDto } from './dto/admin-user.dto';
 import { UpdateReportStatusDto } from '../reports/dto/create-report.dto';
+import { EmailTemplateService } from '../mail/email-template.service';
+import { CreateEmailTemplateDto, TestEmailTemplateDto, UpdateEmailTemplateDto } from '../mail/dto/email-template.dto';
 
 function meta(req: Request) {
   return { ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip, userAgent: req.headers['user-agent'] as string | undefined };
@@ -35,6 +38,7 @@ export class AdminController {
     private readonly admin: AdminService,
     private readonly reports: ReportsService,
     private readonly dashboard: DashboardService,
+    private readonly templates: EmailTemplateService,
   ) {}
 
   // ── Users ──────────────────────────────────────────────────────────
@@ -122,5 +126,48 @@ export class AdminController {
   async dashboardAdmin() {
     const data = await this.dashboard.getAdminDashboard();
     return { success: true, data, message: 'Admin dashboard fetched' };
+  }
+
+  // ── Email templates ──────────────────────────────────────────────
+  @Get('email-templates/notification-types')
+  @ApiOperation({ summary: 'Admin: mappable notification types + variables' })
+  async templateTypes() {
+    const data = await this.templates.notificationTypes();
+    return { success: true, data, message: 'Notification types fetched' };
+  }
+
+  @Get('email-templates')
+  @ApiOperation({ summary: 'Admin: list email templates' })
+  async listTemplates() {
+    const data = await this.templates.list();
+    return { success: true, data, message: 'Templates fetched' };
+  }
+
+  @Post('email-templates')
+  @ApiOperation({ summary: 'Admin: create email template (code + type mapping unique)' })
+  async createTemplate(@Body() dto: CreateEmailTemplateDto) {
+    const data = await this.templates.create(dto);
+    return { success: true, data, message: 'Template created' };
+  }
+
+  @Patch('email-templates/:id')
+  @ApiOperation({ summary: 'Admin: update email template / change its type mapping' })
+  async updateTemplate(@Param('id') id: string, @Body() dto: UpdateEmailTemplateDto) {
+    const data = await this.templates.update(id, dto);
+    return { success: true, data, message: 'Template updated' };
+  }
+
+  @Delete('email-templates/:id')
+  @ApiOperation({ summary: 'Admin: delete email template' })
+  async deleteTemplate(@Param('id') id: string) {
+    const data = await this.templates.remove(id);
+    return { success: true, data, message: 'Template deleted' };
+  }
+
+  @Post('email-templates/:id/test')
+  @ApiOperation({ summary: 'Admin: send a sample rendering of a template to an address' })
+  async testTemplate(@Param('id') id: string, @Body() dto: TestEmailTemplateDto) {
+    const data = await this.templates.sendTest(id, dto.to);
+    return { success: true, data, message: 'Test email processed' };
   }
 }

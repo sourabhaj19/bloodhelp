@@ -184,6 +184,13 @@ export const routes: Routes = [
             (m) => m.MasterCitiesComponent,
           ),
       },
+      {
+        path: 'email-templates',
+        loadComponent: () =>
+          import('./features/admin/email-templates/email-templates.component').then(
+            (m) => m.EmailTemplatesComponent,
+          ),
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },

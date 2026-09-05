@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { SharedUiModule } from '../../shared/shared-ui.module';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
@@ -39,7 +41,8 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         </div>
         <div class="col-12 md:col-8">
           <p-card header="Send a message" subheader="We usually reply within 2 working days">
-            <p-message *ngIf="sent" severity="success" text="Message noted! We'll get back to you soon." styleClass="w-full mb-3"></p-message>
+            <p-message *ngIf="sent" severity="success" [text]="sent" styleClass="w-full mb-3"></p-message>
+            <p-message *ngIf="error" severity="error" [text]="error" styleClass="w-full mb-3"></p-message>
             <form (ngSubmit)="send()" #f="ngForm" class="formgrid grid">
               <div class="field col-12 md:col-6">
                 <label for="name">Name</label>
@@ -58,7 +61,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
                 <textarea pInputTextarea id="msg" [(ngModel)]="form.message" name="message" rows="5" required class="w-full" placeholder="How can we help?"></textarea>
               </div>
               <div class="col-12">
-                <p-button type="submit" label="Send message" icon="pi pi-send" [disabled]="f.invalid" styleClass="w-full md:w-auto"></p-button>
+                <p-button type="submit" label="Send message" icon="pi pi-send" [loading]="sending" [disabled]="f.invalid || sending" styleClass="w-full md:w-auto"></p-button>
               </div>
             </form>
           </p-card>
@@ -79,15 +82,30 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
   ],
 })
 export class ContactComponent {
+  private http = inject(HttpClient);
   private toast = inject(ErrorHandlerService);
+  private cdr = inject(ChangeDetectorRef);
   subjects = ['General question', 'Report an issue', 'Partnership (hospital / NGO)', 'Privacy request', 'Other'];
   form = { name: '', email: '', subject: '', message: '' };
-  sent = false;
+  sent = '';
+  error = '';
+  sending = false;
 
-  send() {
-    this.sent = true;
-    this.toast.showSuccess('Thanks for reaching out! We will reply soon.');
-    this.form = { name: '', email: '', subject: '', message: '' };
-    setTimeout(() => (this.sent = false), 6000);
+  async send() {
+    this.sent = '';
+    this.error = '';
+    this.sending = true;
+    try {
+      const r: any = await firstValueFrom(this.http.post<any>('/api/contact', this.form));
+      this.sent = r.message ?? 'Message received. We will get back to you soon.';
+      this.toast.showSuccess('Message sent! Check your inbox for a confirmation.');
+      this.form = { name: '', email: '', subject: '', message: '' };
+    } catch (e: any) {
+      this.error = this.toast.getUserMessage(e);
+      this.toast.handleHttpError(e, 'Failed to send message');
+    } finally {
+      this.sending = false;
+      this.cdr.markForCheck();
+    }
   }
 }

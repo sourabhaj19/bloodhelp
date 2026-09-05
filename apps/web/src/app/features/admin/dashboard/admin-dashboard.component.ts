@@ -13,8 +13,9 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
         <h1 class="page-title">Admin dashboard</h1>
         <p class="page-sub">Platform health at a glance.</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
         <p-button label="Users" icon="pi pi-users" severity="secondary" [outlined]="true" routerLink="/admin/users"></p-button>
+        <p-button label="Emails" icon="pi pi-envelope" severity="secondary" [outlined]="true" routerLink="/admin/email-templates"></p-button>
         <p-button label="Refresh" icon="pi pi-refresh" [outlined]="true" (onClick)="load()"></p-button>
       </div>
     </div>
