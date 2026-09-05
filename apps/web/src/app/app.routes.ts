@@ -104,6 +104,13 @@ export const routes: Routes = [
             (m) => m.NotificationsComponent,
           ),
       },
+      {
+        path: 'reports',
+        loadComponent: () =>
+          import('./features/reports/my-reports.component').then(
+            (m) => m.MyReportsComponent,
+          ),
+      },
     ],
   },
 

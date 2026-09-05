@@ -71,7 +71,12 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
               <span *ngIf="d.latitude" class="text-sm">{{ d.latitude | number: '1.4-4' }}, {{ d.longitude | number: '1.4-4' }}</span>
               <span *ngIf="!d.latitude" class="muted text-sm">Hidden</span>
             </td>
-            <td><p-button label="Thank" icon="pi pi-heart" size="small" severity="secondary" [outlined]="true" (onClick)="thank(d)"></p-button></td>
+            <td>
+              <div class="flex gap-2">
+                <p-button label="Thank" icon="pi pi-heart" size="small" severity="secondary" [outlined]="true" (onClick)="thank(d)"></p-button>
+                <p-button *ngIf="d.id !== myId" icon="pi pi-flag" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" pTooltip="Report user"></p-button>
+              </div>
+            </td>
           </tr>
         </ng-template>
         <ng-template pTemplate="emptymessage">
@@ -86,6 +91,24 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         </div>
       </div>
     </p-card>
+
+    <p-dialog [(visible)]="reportDialog" header="Report user" [modal]="true" [style]="{ width: 'min(460px, 94vw)' }">
+      <p class="mt-0">Reporting <strong>{{ reportTarget?.displayName || reportTarget?.fullName }}</strong>. Reports are reviewed by admins; false reports may affect your account.</p>
+      <div class="flex flex-column gap-3">
+        <div class="field mb-0">
+          <label for="reason">Reason</label>
+          <p-dropdown inputId="reason" [(ngModel)]="report.reasonId" [options]="reasons" optionLabel="label" optionValue="id" placeholder="Select a reason" [filter]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
+        </div>
+        <div class="field mb-0">
+          <label for="desc">Details (optional)</label>
+          <textarea pInputTextarea id="desc" [(ngModel)]="report.description" rows="4" maxlength="1000" class="w-full" placeholder="What happened?"></textarea>
+        </div>
+      </div>
+      <ng-template pTemplate="footer">
+        <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="reportDialog = false"></p-button>
+        <p-button label="Submit report" icon="pi pi-flag" severity="danger" (onClick)="submitReport()" [loading]="reporting" [disabled]="!report.reasonId"></p-button>
+      </ng-template>
+    </p-dialog>
 
     <p-confirmDialog></p-confirmDialog>
   `,
@@ -114,6 +137,14 @@ export class DonorsComponent implements OnInit {
   loading = false;
   error = '';
   result: any = null;
+  myId = '';
+
+  reasons: any[] = [];
+  reasonsLoaded = false;
+  reportDialog = false;
+  reporting = false;
+  reportTarget: any = null;
+  report: any = { reasonId: '', description: '' };
   filters: any = { bloodGroupId: '', city: '', area: '', pinCode: '', lat: null, lng: null, radiusKm: '', page: 1, pageSize: 20 };
 
   ngOnInit() {
@@ -125,6 +156,7 @@ export class DonorsComponent implements OnInit {
     this.http.get<any>('/api/users/me').subscribe({
       next: (r) => {
         const me = r.data ?? r;
+        this.myId = me?.id || '';
         if (me?.latitude && this.filters.lat == null) {
           this.filters.lat = me.latitude;
           this.filters.lng = me.longitude;
@@ -200,6 +232,43 @@ export class DonorsComponent implements OnInit {
       this.errors.showSuccess(`Thanks sent to ${donor.displayName || donor.fullName || 'donor'}.`);
     } catch (e) {
       this.errors.handleHttpError(e as any, 'Failed to send thanks');
+    }
+  }
+
+  openReport(donor: any) {
+    this.reportTarget = donor;
+    this.report = { reasonId: '', description: '' };
+    this.reportDialog = true;
+    this.cdr.markForCheck();
+    if (!this.reasonsLoaded) {
+      this.http.get<any>('/api/reports/reasons').subscribe({
+        next: (r) => {
+          this.reasons = r.data ?? r ?? [];
+          this.reasonsLoaded = true;
+          this.cdr.markForCheck();
+        },
+        error: (e) => this.errors.handleHttpError(e, 'Failed to load report reasons'),
+      });
+    }
+  }
+
+  async submitReport() {
+    if (!this.reportTarget || !this.report.reasonId) return;
+    this.reporting = true;
+    try {
+      const payload: any = {
+        reportedUserId: this.reportTarget.id,
+        reasonId: this.report.reasonId,
+      };
+      if (this.report.description?.trim()) payload.description = this.report.description.trim();
+      await firstValueFrom(this.http.post<any>('/api/reports', payload));
+      this.errors.showSuccess('Report submitted. Admins will review it.');
+      this.reportDialog = false;
+    } catch (e) {
+      this.errors.handleHttpError(e as any, 'Failed to submit report');
+    } finally {
+      this.reporting = false;
+      this.cdr.markForCheck();
     }
   }
 }

@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { SharedUiModule } from '../../shared/shared-ui.module';
+import { AuthService } from '../../core/services/auth.service';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
 @Component({
@@ -23,12 +25,13 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
     </p-card>
 
     <div *ngIf="!loading" class="flex flex-column gap-2">
-      <p-card *ngFor="let n of items" [styleClass]="n.isRead ? 'read' : 'unread'">
+      <p-card *ngFor="let n of items" [styleClass]="(n.isRead ? 'read' : 'unread') + (hasReport(n) ? ' clickable' : '')">
         <div class="flex align-items-start justify-content-between gap-2">
-          <div>
+          <div [class.linkable]="hasReport(n)" (click)="openLinked(n)" [style.cursor]="hasReport(n) ? 'pointer' : 'default'">
             <div class="flex align-items-center gap-2">
               <strong>{{ n.title }}</strong>
               <p-tag *ngIf="!n.isRead" value="New" severity="danger"></p-tag>
+              <p-tag *ngIf="hasReport(n)" value="View report" severity="info"></p-tag>
             </div>
             <div class="muted text-sm">{{ n.createdAt | date: 'medium' }}</div>
             <p class="mt-2 mb-0">{{ n.message }}</p>
@@ -48,11 +51,15 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       .muted { color: #667085; }
       :host ::ng-deep .unread { border-left: 4px solid #b42318; }
       :host ::ng-deep .read { opacity: 0.85; }
+      :host ::ng-deep .clickable:hover { box-shadow: 0 4px 8px rgba(16, 24, 40, 0.08), 0 12px 28px -6px rgba(180, 35, 24, 0.18); }
+      .linkable:hover strong { color: #b42318; }
     `,
   ],
 })
 export class NotificationsComponent implements OnInit {
   private http = inject(HttpClient);
+  private router = inject(Router);
+  private auth = inject(AuthService);
   private errors = inject(ErrorHandlerService);
   private cdr = inject(ChangeDetectorRef);
 
@@ -79,6 +86,19 @@ export class NotificationsComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  hasReport(n: any): boolean {
+    return n?.referenceType === 'REPORT' && !!n?.referenceId;
+  }
+
+  /** Report notifications deep-link to the report brief (marks the notification read). */
+  openLinked(n: any) {
+    if (!this.hasReport(n)) return;
+    if (!n.isRead) this.mark(n);
+    const reportId = n.referenceId;
+    if (this.auth.isAdmin()) this.router.navigate(['/admin/reports'], { queryParams: { reportId } });
+    else this.router.navigate(['/reports'], { queryParams: { reportId } });
   }
 
   mark(n: any) {

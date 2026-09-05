@@ -60,6 +60,52 @@ export class ReportsService {
     return report;
   }
 
+  async listReasons() {
+    return this.prisma.reportReason.findMany({
+      where: { active: true },
+      orderBy: { label: 'asc' },
+    });
+  }
+
+  /** Reports filed BY a user — brief view, adminComment stays internal. */
+  async listMine(reporterId: string) {
+    return this.prisma.userReport.findMany({
+      where: { reportedByUserId: reporterId },
+      select: {
+        id: true,
+        status: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
+        reason: { select: { id: true, code: true, label: true } },
+        reportedUser: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getOneMine(id: string, reporterId: string) {
+    const report = await this.prisma.userReport.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
+        reportedByUserId: true,
+        reason: { select: { id: true, code: true, label: true } },
+        reportedUser: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+    if (!report) throw new NotFoundException({ code: 'REPORT_NOT_FOUND', message: 'Report not found' });
+    if (report.reportedByUserId !== reporterId) {
+      throw new ForbiddenException({ code: 'FORBIDDEN', message: 'Not your report' });
+    }
+    const { reportedByUserId: _omit, ...brief } = report;
+    return brief;
+  }
+
   // Admin methods
   async listAdmin(page = 1, pageSize = 20, status?: string) {
     const skip = (page - 1) * pageSize;

@@ -19,6 +19,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/donors" routerLinkActive="active">Donors</a>
         <a routerLink="/appreciations" routerLinkActive="active">Thanks</a>
         <a routerLink="/notifications" routerLinkActive="active">Notifications</a>
+        <a routerLink="/reports" routerLinkActive="active">My reports</a>
         <a routerLink="/profile" routerLinkActive="active">Profile</a>
       </nav>
       <div class="topbar-actions">
@@ -36,6 +37,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/donors" routerLinkActive="active" (click)="sidebar = false" class="side-link">Find donors</a>
         <a routerLink="/appreciations" routerLinkActive="active" (click)="sidebar = false" class="side-link">Thanks</a>
         <a routerLink="/notifications" routerLinkActive="active" (click)="sidebar = false" class="side-link">Notifications</a>
+        <a routerLink="/reports" routerLinkActive="active" (click)="sidebar = false" class="side-link">My reports</a>
         <a routerLink="/profile" routerLinkActive="active" (click)="sidebar = false" class="side-link">Profile</a>
         <p-divider></p-divider>
         <p-button label="Logout" icon="pi pi-sign-out" severity="secondary" [outlined]="true" styleClass="w-full" (onClick)="logout()"></p-button>
