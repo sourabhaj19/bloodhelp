@@ -89,6 +89,16 @@ export class AuthService {
     }
   }
 
+  async changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<string | null> {
+    const res: any = await firstValueFrom(
+      this.http.post('/api/auth/change-password', { currentPassword, newPassword, confirmPassword }, { withCredentials: true }),
+    );
+    const data = res.data ?? res;
+    // Session was rotated server-side — adopt the fresh access token
+    if (data?.accessToken) this._accessToken.set(data.accessToken);
+    return data?.accessToken ?? null;
+  }
+
   async forgotPassword(email: string) {
     return firstValueFrom(this.http.post('/api/auth/forgot-password', { email }, { withCredentials: true }));
   }

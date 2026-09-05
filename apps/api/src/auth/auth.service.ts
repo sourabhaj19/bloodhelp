@@ -12,7 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../database/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { ResetPasswordDto } from './dto/forgot-password.dto';
+import { ChangePasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
 import {
   hashPassword,
   verifyPassword,
@@ -393,6 +393,62 @@ export class AuthService {
     });
 
     return { success: true };
+  }
+
+  /**
+   * Change password while logged in. Verifies the current password, enforces
+   * the password policy, revokes ALL existing refresh sessions, and issues a
+   * fresh token pair so the user stays logged in on this device only.
+   */
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+    persistent: boolean,
+    meta: { ip?: string; userAgent?: string },
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    if (!user.active) throw new ForbiddenException({ code: 'AUTH_ACCOUNT_DISABLED', message: 'Account is disabled' });
+
+    const currentOk = await verifyPassword(user.passwordHash, dto.currentPassword);
+    if (!currentOk) {
+      throw new UnauthorizedException({ code: 'AUTH_INVALID_CURRENT_PASSWORD', message: 'Current password is incorrect' });
+    }
+
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException({ code: 'PASSWORD_MISMATCH', message: 'Passwords do not match' });
+    }
+    const sameAsCurrent = await verifyPassword(user.passwordHash, dto.newPassword);
+    if (sameAsCurrent) {
+      throw new BadRequestException({ code: 'PASSWORD_SAME_AS_CURRENT', message: 'New password must be different from the current password' });
+    }
+    const policy = getPasswordPolicy(this.config);
+    const errors = validatePasswordPolicy(dto.newPassword, policy);
+    if (errors.length) throw new BadRequestException({ code: 'PASSWORD_POLICY', message: errors.join('; '), details: errors });
+
+    const newHash = await hashPassword(dto.newPassword);
+    const ttlMs = persistent ? this.refreshExpiresInMs() : this.refreshExpiresInShortMs();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { passwordHash: newHash } });
+      // Revoke every session (including stolen ones) — fresh pair issued below
+      await tx.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await tx.securityEvent.create({
+        data: { userId: user.id, type: 'PASSWORD_CHANGED', ipAddress: meta.ip, userAgent: meta.userAgent },
+      });
+      await tx.notification.create({
+        data: {
+          userId: user.id,
+          type: 'PASSWORD_CHANGED',
+          title: 'Password changed',
+          message: 'Your password was just changed. All other devices were logged out. If this was not you, reset your password immediately.',
+        },
+      });
+    });
+
+    const accessToken = this.signAccessToken(user);
+    const { refreshToken } = await this.createRefreshToken(user.id, meta, ttlMs);
+    return { accessToken, refreshToken, persistent, refreshExpiresInMs: ttlMs };
   }
 
   private toPublicUser(user: any) {
