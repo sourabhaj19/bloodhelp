@@ -43,7 +43,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
         </div>
         <div class="col-12 md:col-5 flex align-items-end gap-2">
-          <p-button label="Search" icon="pi pi-search" (onClick)="search()" [loading]="loading"></p-button>
+          <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
           <p-button label="Near me" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
           <p-button label="Reset" severity="secondary" [text]="true" (onClick)="reset()"></p-button>
         </div>
@@ -83,13 +83,14 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <tr><td colspan="6" class="text-center muted">No donors match. Try a wider radius.</td></tr>
         </ng-template>
       </p-table>
-      <div class="flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
-        <span class="muted text-sm">Page {{ result.page }} / {{ result.totalPages }} ({{ result.total }} total)</span>
-        <div class="flex gap-2">
-          <p-button label="Prev" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" size="small" [disabled]="filters.page <= 1" (onClick)="prev()"></p-button>
-          <p-button label="Next" icon="pi pi-arrow-right" iconPos="right" severity="secondary" [outlined]="true" size="small" [disabled]="result.page >= result.totalPages" (onClick)="next()"></p-button>
-        </div>
-      </div>
+      <p-paginator
+        [rows]="filters.pageSize"
+        [totalRecords]="result.total ?? 0"
+        [rowsPerPageOptions]="[10, 20, 50]"
+        [first]="(filters.page - 1) * filters.pageSize"
+        (onPageChange)="onPage($event)"
+        styleClass="mt-3">
+      </p-paginator>
     </p-card>
 
     <p-dialog [(visible)]="reportDialog" header="Report user" [modal]="true" [style]="{ width: 'min(460px, 94vw)' }">
@@ -201,8 +202,16 @@ export class DonorsComponent implements OnInit {
     this.search();
   }
 
-  prev() { if (this.filters.page > 1) { this.filters.page--; this.search(); } }
-  next() { if (this.result && this.filters.page < this.result.totalPages) { this.filters.page++; this.search(); } }
+  onSearch() {
+    this.filters.page = 1;
+    this.search();
+  }
+
+  onPage(e: any) {
+    this.filters.page = e.page + 1;
+    this.filters.pageSize = e.rows;
+    this.search();
+  }
 
   useMyLocation() {
     if (!navigator.geolocation) {

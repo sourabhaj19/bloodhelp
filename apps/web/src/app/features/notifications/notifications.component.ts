@@ -42,6 +42,15 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       <p-card *ngIf="!items.length">
         <p class="text-center muted">You're all caught up. No notifications.</p>
       </p-card>
+      <p-paginator
+        *ngIf="total > pageSize"
+        [rows]="pageSize"
+        [totalRecords]="total"
+        [rowsPerPageOptions]="[10, 20, 50]"
+        [first]="(page - 1) * pageSize"
+        (onPageChange)="onPage($event)"
+        styleClass="mt-2">
+      </p-paginator>
     </div>
   `,
   styles: [
@@ -66,16 +75,27 @@ export class NotificationsComponent implements OnInit {
   items: any[] = [];
   loading = true;
   error = '';
+  page = 1;
+  pageSize = 20;
+  total = 0;
 
   ngOnInit() { this.load(); }
+
+  onPage(e: any) {
+    this.page = e.page + 1;
+    this.pageSize = e.rows;
+    this.load();
+  }
 
   load() {
     this.loading = true;
     this.cdr.markForCheck();
-    this.http.get<any>('/api/notifications').subscribe({
+    const params = { page: String(this.page), pageSize: String(this.pageSize) };
+    this.http.get<any>('/api/notifications', { params }).subscribe({
       next: (r) => {
         const d = r.data ?? r;
         this.items = d.items ?? (Array.isArray(d) ? d : []);
+        this.total = d.total ?? this.items.length;
         this.loading = false;
         this.cdr.markForCheck();
       },

@@ -20,7 +20,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
     </p-card>
 
     <p-card *ngIf="!loading" header="Filed reports" [subheader]="rows.length + ' total'">
-      <p-table [value]="rows" styleClass="p-datatable-sm" responsiveLayout="scroll">
+      <p-table [value]="rows" styleClass="p-datatable-sm" responsiveLayout="scroll" [paginator]="true" [rows]="10" [rowsPerPageOptions]="[10, 25, 50]">
         <ng-template pTemplate="header">
           <tr><th>Reported user</th><th>Reason</th><th>Status</th><th>Filed</th><th></th></tr>
         </ng-template>

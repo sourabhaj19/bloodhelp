@@ -40,7 +40,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             <p-inputNumber inputId="lng" [(ngModel)]="filters.lng" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full" placeholder="72.8777"></p-inputNumber>
           </div>
           <div class="col-12 md:col-6 flex align-items-end gap-2">
-            <p-button label="Search" icon="pi pi-search" (onClick)="search()" [loading]="loading"></p-button>
+            <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
             <p-button label="Reset" severity="secondary" [outlined]="true" (onClick)="reset()"></p-button>
           </div>
         </div>
@@ -69,13 +69,14 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             <tr><td colspan="4" class="text-center muted">No donors found. Try widening the radius or clearing filters.</td></tr>
           </ng-template>
         </p-table>
-        <div class="flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
-          <span class="muted text-sm">Page {{ result.page }} / {{ result.totalPages }} ({{ result.total }} total)</span>
-          <div class="flex gap-2">
-            <p-button label="Prev" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" size="small" [disabled]="filters.page <= 1" (onClick)="prev()"></p-button>
-            <p-button label="Next" icon="pi pi-arrow-right" iconPos="right" severity="secondary" [outlined]="true" size="small" [disabled]="result.page >= result.totalPages" (onClick)="next()"></p-button>
-          </div>
-        </div>
+        <p-paginator
+          [rows]="filters.pageSize"
+          [totalRecords]="result.total ?? 0"
+          [rowsPerPageOptions]="[10, 20, 50]"
+          [first]="(filters.page - 1) * filters.pageSize"
+          (onPageChange)="onPage($event)"
+          styleClass="mt-3">
+        </p-paginator>
       </p-card>
     </div>
   `,
@@ -148,6 +149,14 @@ export class PublicSearchComponent implements OnInit {
     this.search();
   }
 
-  prev() { if (this.filters.page > 1) { this.filters.page--; this.search(); } }
-  next() { if (this.result && this.filters.page < this.result.totalPages) { this.filters.page++; this.search(); } }
+  onSearch() {
+    this.filters.page = 1;
+    this.search();
+  }
+
+  onPage(e: any) {
+    this.filters.page = e.page + 1;
+    this.filters.pageSize = e.rows;
+    this.search();
+  }
 }

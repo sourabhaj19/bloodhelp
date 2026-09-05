@@ -56,13 +56,14 @@ const STATUSES = ['OPEN', 'UNDER_REVIEW', 'RESOLVED', 'REJECTED'] as const;
           <tr><td colspan="6" class="text-center muted">No reports with this status.</td></tr>
         </ng-template>
       </p-table>
-      <div class="flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
-        <span class="muted text-sm">Page {{ result.page }} / {{ result.totalPages }} ({{ result.total }} total)</span>
-        <div class="flex gap-2">
-          <p-button label="Prev" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" size="small" [disabled]="page <= 1" (onClick)="prev()"></p-button>
-          <p-button label="Next" icon="pi pi-arrow-right" iconPos="right" severity="secondary" [outlined]="true" size="small" [disabled]="result.page >= result.totalPages" (onClick)="next()"></p-button>
-        </div>
-      </div>
+      <p-paginator
+        [rows]="pageSize"
+        [totalRecords]="result.total ?? 0"
+        [rowsPerPageOptions]="[10, 20, 50]"
+        [first]="(page - 1) * pageSize"
+        (onPageChange)="onPage($event)"
+        styleClass="mt-3">
+      </p-paginator>
     </p-card>
 
     <p-dialog [(visible)]="dialog" header="Review report" [modal]="true" [style]="{ width: 'min(560px, 96vw)' }">
@@ -161,8 +162,11 @@ export class AdminReportsComponent implements OnInit {
     });
   }
 
-  prev() { if (this.page > 1) { this.page--; this.load(); } }
-  next() { if (this.result && this.page < this.result.totalPages) { this.page++; this.load(); } }
+  onPage(e: any) {
+    this.page = e.page + 1;
+    this.pageSize = e.rows;
+    this.load();
+  }
 
   pretty(s: string): string {
     return s === 'UNDER_REVIEW' ? 'Under review' : s.charAt(0) + s.slice(1).toLowerCase();

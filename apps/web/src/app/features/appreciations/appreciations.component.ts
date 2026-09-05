@@ -17,7 +17,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       <p-tabPanel [header]="'Received (' + received.length + ')'">
         <p-skeleton *ngIf="loadingR" height="4rem" styleClass="mb-2" class="block"></p-skeleton>
         <div class="flex flex-column gap-2" *ngIf="!loadingR">
-          <p-card *ngFor="let a of received">
+          <p-card *ngFor="let a of pagedReceived">
             <div class="flex align-items-center gap-3">
               <p-avatar [label]="(a.sender?.firstName || '?').charAt(0)" shape="circle" styleClass="avatar-red"></p-avatar>
               <div>
@@ -28,12 +28,13 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             </div>
           </p-card>
           <p-card *ngIf="!received.length"><p class="text-center muted">No thanks received yet.</p></p-card>
+          <p-paginator *ngIf="received.length > pageSizeR" [rows]="pageSizeR" [totalRecords]="received.length" [rowsPerPageOptions]="[5, 10, 20]" [first]="(pageR - 1) * pageSizeR" (onPageChange)="onPageR($event)" styleClass="mt-1"></p-paginator>
         </div>
       </p-tabPanel>
       <p-tabPanel [header]="'Given (' + given.length + ')'">
         <p-skeleton *ngIf="loadingG" height="4rem" styleClass="mb-2" class="block"></p-skeleton>
         <div class="flex flex-column gap-2" *ngIf="!loadingG">
-          <p-card *ngFor="let a of given">
+          <p-card *ngFor="let a of pagedGiven">
             <div class="flex align-items-center gap-3">
               <p-avatar [label]="(a.receiver?.firstName || '?').charAt(0)" shape="circle"></p-avatar>
               <div>
@@ -44,6 +45,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             </div>
           </p-card>
           <p-card *ngIf="!given.length"><p class="text-center muted">You haven't thanked anyone yet. Find a donor to thank them.</p></p-card>
+          <p-paginator *ngIf="given.length > pageSizeG" [rows]="pageSizeG" [totalRecords]="given.length" [rowsPerPageOptions]="[5, 10, 20]" [first]="(pageG - 1) * pageSizeG" (onPageChange)="onPageG($event)" styleClass="mt-1"></p-paginator>
         </div>
       </p-tabPanel>
     </p-tabView>
@@ -67,6 +69,28 @@ export class AppreciationsComponent implements OnInit {
   loadingR = true;
   loadingG = true;
   error = '';
+  pageR = 1;
+  pageSizeR = 5;
+  pageG = 1;
+  pageSizeG = 5;
+
+  get pagedReceived(): any[] {
+    return this.received.slice((this.pageR - 1) * this.pageSizeR, this.pageR * this.pageSizeR);
+  }
+
+  get pagedGiven(): any[] {
+    return this.given.slice((this.pageG - 1) * this.pageSizeG, this.pageG * this.pageSizeG);
+  }
+
+  onPageR(e: any) {
+    this.pageR = (e.page ?? 0) + 1;
+    this.pageSizeR = e.rows ?? this.pageSizeR;
+  }
+
+  onPageG(e: any) {
+    this.pageG = (e.page ?? 0) + 1;
+    this.pageSizeG = e.rows ?? this.pageSizeG;
+  }
 
   ngOnInit() {
     this.http.get<any>('/api/appreciations/received').subscribe({

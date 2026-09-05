@@ -26,7 +26,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
     </p-card>
 
     <p-card *ngIf="!loading" header="All countries" [subheader]="rows.length + ' record(s)'">
-      <p-table [value]="rows" styleClass="p-datatable-sm" responsiveLayout="scroll">
+      <p-table [value]="rows" styleClass="p-datatable-sm" responsiveLayout="scroll" [paginator]="true" [rows]="10" [rowsPerPageOptions]="[10, 25, 50]">
         <ng-template pTemplate="header">
           <tr><th>Name</th><th>ISO-2</th><th>Status</th><th style="width: 170px"></th></tr>
         </ng-template>

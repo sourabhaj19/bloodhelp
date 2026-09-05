@@ -27,6 +27,7 @@ import { DialogModule } from 'primeng/dialog';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TabViewModule } from 'primeng/tabview';
 import { TabMenuModule } from 'primeng/tabmenu';
+import { PaginatorModule } from 'primeng/paginator';
 import { AccordionModule } from 'primeng/accordion';
 import { FieldsetModule } from 'primeng/fieldset';
 import { PanelModule } from 'primeng/panel';
@@ -76,6 +77,7 @@ import { InputSwitchModule } from 'primeng/inputswitch';
     ConfirmDialogModule,
     TabViewModule,
     TabMenuModule,
+    PaginatorModule,
     AccordionModule,
     FieldsetModule,
     PanelModule,
@@ -124,6 +126,7 @@ import { InputSwitchModule } from 'primeng/inputswitch';
     ConfirmDialogModule,
     TabViewModule,
     TabMenuModule,
+    PaginatorModule,
     AccordionModule,
     FieldsetModule,
     PanelModule,

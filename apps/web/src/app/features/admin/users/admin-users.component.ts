@@ -16,9 +16,9 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
       <div class="flex gap-2">
         <p-iconField iconPosition="left" styleClass="w-full">
           <p-inputIcon styleClass="pi pi-search"></p-inputIcon>
-          <input pInputText [(ngModel)]="search" placeholder="Search email / name / mobile" class="w-full" (keyup.enter)="load()" />
+          <input pInputText [(ngModel)]="search" placeholder="Search email / name / mobile" class="w-full" (keyup.enter)="onSearch()" />
         </p-iconField>
-        <p-button label="Search" icon="pi pi-search" (onClick)="load()" [loading]="loading"></p-button>
+        <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
       </div>
     </p-card>
 
@@ -51,6 +51,14 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
           <tr><td colspan="5" class="text-center muted">No users found.</td></tr>
         </ng-template>
       </p-table>
+      <p-paginator
+        [rows]="pageSize"
+        [totalRecords]="result.total ?? 0"
+        [rowsPerPageOptions]="[10, 20, 50]"
+        [first]="(page - 1) * pageSize"
+        (onPageChange)="onPage($event)"
+        styleClass="mt-3">
+      </p-paginator>
     </p-card>
 
     <p-confirmDialog></p-confirmDialog>
@@ -73,11 +81,24 @@ export class AdminUsersComponent implements OnInit {
   loading = false;
   error = '';
   result: any = null;
+  page = 1;
+  pageSize = 20;
 
   ngOnInit() { this.load(); }
 
+  onSearch() {
+    this.page = 1;
+    this.load();
+  }
+
+  onPage(e: any) {
+    this.page = e.page + 1;
+    this.pageSize = e.rows;
+    this.load();
+  }
+
   load() {
-    let params = new HttpParams().set('page', '1').set('pageSize', '20');
+    let params = new HttpParams().set('page', String(this.page)).set('pageSize', String(this.pageSize));
     if (this.search.trim()) params = params.set('search', this.search.trim());
     this.loading = true;
     this.error = '';
