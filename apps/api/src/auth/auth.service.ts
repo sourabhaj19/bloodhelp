@@ -36,24 +36,32 @@ export class AuthService {
   private accessExpiresIn(): string {
     return this.config.get<string>('app.jwt.accessExpiresIn', '15m')!;
   }
-  private refreshExpiresInMs(): number {
-    const raw = this.config.get<string>('app.jwt.refreshExpiresIn', '30d')!;
-    // parse simple durations: 15m, 30d, 1h
+  // parse simple durations: 15m, 30d, 1h
+  private parseDurationMs(raw: string, fallbackMs: number): number {
     const match = raw.match(/^(\d+)([smhd])$/);
-    if (!match) return 30 * 24 * 60 * 60 * 1000;
+    if (!match) return fallbackMs;
     const n = parseInt(match[1], 10);
-    const unit = match[2];
     const mult: Record<string, number> = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
-    return n * mult[unit];
+    return n * mult[match[2]];
+  }
+  private refreshExpiresInMs(): number {
+    return this.parseDurationMs(
+      this.config.get<string>('app.jwt.refreshExpiresIn', '30d')!,
+      30 * 24 * 60 * 60 * 1000,
+    );
+  }
+  // Short-lived refresh for sessions WITHOUT "remember me"
+  private refreshExpiresInShortMs(): number {
+    return this.parseDurationMs(
+      this.config.get<string>('app.jwt.refreshExpiresInShort', '1d')!,
+      24 * 60 * 60 * 1000,
+    );
   }
   private passwordResetExpiresInMs(): number {
-    const raw = this.config.get<string>('app.password.resetExpiresIn', '30m')!;
-    const match = raw.match(/^(\d+)([smhd])$/);
-    if (!match) return 30 * 60 * 1000;
-    const n = parseInt(match[1], 10);
-    const unit = match[2];
-    const mult: Record<string, number> = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
-    return n * mult[unit];
+    return this.parseDurationMs(
+      this.config.get<string>('app.password.resetExpiresIn', '30m')!,
+      30 * 60 * 1000,
+    );
   }
 
   private signAccessToken(user: { id: string; email: string; role: string }) {
@@ -183,17 +191,25 @@ export class AuthService {
       data: { userId: user.id, identifier, success: true, ipAddress: meta.ip, userAgent: meta.userAgent },
     });
 
-    const accessToken = this.signAccessToken(user);
-    const { refreshToken } = await this.createRefreshToken(user.id, meta);
+    // "Remember me" checked → long-lived refresh; otherwise a short session
+    const rememberMe = dto.rememberMe === true;
+    const refreshTtlMs = rememberMe ? this.refreshExpiresInMs() : this.refreshExpiresInShortMs();
 
-    return { user: this.toPublicUser(user), accessToken, refreshToken };
+    const accessToken = this.signAccessToken(user);
+    const { refreshToken } = await this.createRefreshToken(user.id, meta, refreshTtlMs);
+
+    return { user: this.toPublicUser(user), accessToken, refreshToken, rememberMe, refreshExpiresInMs: refreshTtlMs };
   }
 
-  private async createRefreshToken(userId: string, meta: { ip?: string; userAgent?: string }) {
+  private async createRefreshToken(
+    userId: string,
+    meta: { ip?: string; userAgent?: string },
+    expiresInMs: number = this.refreshExpiresInMs(),
+  ) {
     const raw = randomToken(32);
     const tokenHash = sha256(raw);
     const familyId = randomFamilyId();
-    const expiresAt = new Date(Date.now() + this.refreshExpiresInMs());
+    const expiresAt = new Date(Date.now() + expiresInMs);
     await this.prisma.refreshToken.create({
       data: {
         userId,
@@ -240,10 +256,13 @@ export class AuthService {
       throw new ForbiddenException({ code: 'AUTH_ACCOUNT_DISABLED', message: 'Account disabled' });
     }
 
-    // Rotate: revoke old, issue new in same family
+    // Rotate: revoke old, issue new in same family.
+    // Preserve the ORIGINAL absolute expiry (chosen at login via rememberMe)
+    // so rotation extends the session slidingly only via access tokens —
+    // a short session can never silently become a 30-day one.
     const newRaw = randomToken(32);
     const newHash = sha256(newRaw);
-    const newExpiresAt = new Date(Date.now() + this.refreshExpiresInMs());
+    const newExpiresAt = existing.expiresAt;
 
     await this.prisma.$transaction([
       this.prisma.refreshToken.update({
@@ -262,8 +281,11 @@ export class AuthService {
       }),
     ]);
 
+    // A family outliving the short-session TTL must have come from "remember me"
+    const persistent = newExpiresAt.getTime() - Date.now() > this.refreshExpiresInShortMs();
+
     const accessToken = this.signAccessToken(user);
-    return { accessToken, refreshToken: newRaw, user };
+    return { accessToken, refreshToken: newRaw, user, refreshExpiresAt: newExpiresAt, persistent };
   }
 
   async refresh(presentedRaw: string | undefined, meta: { ip?: string; userAgent?: string }) {

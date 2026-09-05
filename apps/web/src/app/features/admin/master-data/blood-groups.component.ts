@@ -1,7 +1,38 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { SharedUiModule } from '../../../shared/shared-ui.module';
+import { ErrorHandlerService } from '../../../core/services/error-handler.service';
+
 @Component({
   standalone: true,
+  imports: [SharedUiModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<section class="panel"><h1>Master — Blood Groups</h1><p>CRUD, DELETE blocked 409 if referenced — Phase 9.</p></section>`,
+  template: `
+    <h1 class="page-title">Blood groups</h1>
+    <p class="page-sub">Reference data used at registration and search. Delete is blocked (409) while a group is referenced.</p>
+    <p-message *ngIf="error" severity="error" [text]="error" styleClass="w-full mb-3"></p-message>
+    <p-card *ngIf="loading" header="Loading…"><p-skeleton height="3rem" styleClass="mb-2" *ngFor="let i of [1,2,3]"></p-skeleton></p-card>
+    <p-card *ngIf="!loading" header="All groups" [subheader]="rows.length + ' record(s)'">
+      <p-table [value]="rows" styleClass="p-datatable-sm">
+        <ng-template pTemplate="header"><tr><th>Code</th><th>Label</th></tr></ng-template>
+        <ng-template pTemplate="body" let-b><tr><td><p-tag [value]="b.code" severity="danger"></p-tag></td><td>{{ b.label || '—' }}</td></tr></ng-template>
+        <ng-template pTemplate="emptymessage"><tr><td colspan="2" class="text-center muted">No blood groups found.</td></tr></ng-template>
+      </p-table>
+    </p-card>
+  `,
+  styles: [` .muted { color: #98a2b3; } `],
 })
-export class MasterBloodGroupsComponent {}
+export class MasterBloodGroupsComponent implements OnInit {
+  private http = inject(HttpClient);
+  private errors = inject(ErrorHandlerService);
+  private cdr = inject(ChangeDetectorRef);
+  rows: any[] = [];
+  loading = true;
+  error = '';
+  ngOnInit() {
+    this.http.get<any>('/api/master/blood-groups').subscribe({
+      next: (r) => { this.rows = r.data ?? r ?? []; this.loading = false; this.cdr.markForCheck(); },
+      error: (e) => { this.error = this.errors.getUserMessage(e); this.errors.handleHttpError(e, 'Failed to load blood groups'); this.loading = false; this.cdr.markForCheck(); },
+    });
+  }
+}

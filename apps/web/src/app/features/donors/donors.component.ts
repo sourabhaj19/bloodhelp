@@ -1,70 +1,135 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { AuthService } from '../../core/services/auth.service';
+import { firstValueFrom } from 'rxjs';
+import { SharedUiModule } from '../../shared/shared-ui.module';
+import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, CommonModule],
+  imports: [SharedUiModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="panel" style="margin:16px 4vw">
-      <h1>Donor Search (Authenticated — tiered authenticated DTOs)</h1>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0">
-        <select [(ngModel)]="filters.bloodGroupId" style="padding:8px"><option value="">All blood groups</option><option *ngFor="let bg of bloodGroups" [value]="bg.id">{{bg.code}}</option></select>
-        <input [(ngModel)]="filters.city" placeholder="City" style="padding:8px" />
-        <input [(ngModel)]="filters.area" placeholder="Area" style="padding:8px" />
-        <input [(ngModel)]="filters.pinCode" placeholder="PinCode" style="padding:8px" />
-        <input [(ngModel)]="filters.lat" type="number" step="0.000001" placeholder="Lat" style="padding:8px;width:120px" />
-        <input [(ngModel)]="filters.lng" type="number" step="0.000001" placeholder="Lng" style="padding:8px;width:120px" />
-        <select [(ngModel)]="filters.radiusKm" style="padding:8px"><option value="">Any radius</option><option value="5">5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="100">100 km</option></select>
-        <button (click)="search()" style="background:#b42318;color:white;padding:8px 16px;border:none;border-radius:8px">Search</button>
-        <button (click)="useMyLocation()" style="padding:8px 12px">Use my location</button>
+    <h1 class="page-title">Find donors</h1>
+    <p class="page-sub">Authenticated search with contact details and precise location.</p>
+
+    <p-card styleClass="mb-3">
+      <div class="formgrid grid">
+        <div class="field col-12 md:col-3">
+          <label for="bg">Blood group</label>
+          <p-dropdown inputId="bg" [(ngModel)]="filters.bloodGroupId" [options]="bloodGroups" optionLabel="code" optionValue="id" placeholder="All groups" [showClear]="true" styleClass="w-full"></p-dropdown>
+        </div>
+        <div class="field col-12 md:col-3">
+          <label for="city">City</label>
+          <input pInputText id="city" [(ngModel)]="filters.city" placeholder="City" class="w-full" />
+        </div>
+        <div class="field col-6 md:col-3">
+          <label for="area">Area</label>
+          <input pInputText id="area" [(ngModel)]="filters.area" placeholder="Area" class="w-full" />
+        </div>
+        <div class="field col-6 md:col-3">
+          <label for="pin">Pin code</label>
+          <input pInputText id="pin" [(ngModel)]="filters.pinCode" placeholder="Pin code" class="w-full" />
+        </div>
+        <div class="field col-6 md:col-2">
+          <label for="lat">Latitude</label>
+          <p-inputNumber inputId="lat" [(ngModel)]="filters.lat" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full"></p-inputNumber>
+        </div>
+        <div class="field col-6 md:col-2">
+          <label for="lng">Longitude</label>
+          <p-inputNumber inputId="lng" [(ngModel)]="filters.lng" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full"></p-inputNumber>
+        </div>
+        <div class="field col-12 md:col-3">
+          <label for="radius">Radius</label>
+          <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" styleClass="w-full"></p-dropdown>
+        </div>
+        <div class="col-12 md:col-5 flex align-items-end gap-2">
+          <p-button label="Search" icon="pi pi-search" (onClick)="search()" [loading]="loading"></p-button>
+          <p-button label="Near me" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
+          <p-button label="Reset" severity="secondary" [text]="true" (onClick)="reset()"></p-button>
+        </div>
       </div>
-      <p *ngIf="loading">Loading...</p>
-      <p *ngIf="error" style="color:#b42318">{{error}}</p>
-      <table *ngIf="result" style="width:100%;border-collapse:collapse">
-        <thead><tr style="text-align:left;border-bottom:1px solid #e5e7eb"><th>Name</th><th>Blood</th><th>Location</th><th>Distance</th><th>Contact</th><th>Thanks</th></tr></thead>
-        <tbody>
-          <tr *ngFor="let d of result.items" style="border-bottom:1px solid #f2f4f7">
-            <td>{{d.displayName || d.fullName}}</td>
-            <td>{{d.bloodGroup}}</td>
-            <td>{{d.city}} {{d.area}}</td>
-            <td>{{d.approxDistanceKm ?? '—'}} km</td>
+    </p-card>
+
+    <p-message *ngIf="error" severity="error" [text]="error" styleClass="w-full mb-3"></p-message>
+
+    <p-card *ngIf="loading" header="Searching…">
+      <p-skeleton height="3rem" styleClass="mb-2" *ngFor="let i of [1, 2, 3, 4]"></p-skeleton>
+    </p-card>
+
+    <p-card *ngIf="!loading && result" header="Donors" [subheader]="result.total + ' found'">
+      <p-table [value]="result.items ?? []" styleClass="p-datatable-sm" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr><th>Name</th><th>Blood</th><th>Location</th><th>Distance</th><th>Contact</th><th></th></tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-d>
+          <tr>
+            <td><p-avatar [label]="(d.displayName || d.fullName || '?').charAt(0)" shape="circle" styleClass="mr-2"></p-avatar><strong>{{ d.displayName || d.fullName }}</strong></td>
+            <td><p-tag [value]="d.bloodGroup" severity="danger"></p-tag></td>
+            <td>{{ d.city }}<span *ngIf="d.area"> · {{ d.area }}</span><div *ngIf="d.pinCode" class="muted text-sm">{{ d.pinCode }}</div></td>
+            <td><span *ngIf="d.approxDistanceKm">~{{ d.approxDistanceKm }} km</span><span *ngIf="!d.approxDistanceKm" class="muted">—</span></td>
             <td>
-              <span *ngIf="d.latitude">{{d.pinCode}} — {{d.latitude | number:'1.4-4'}},{{d.longitude | number:'1.4-4'}}</span>
-              <span *ngIf="!d.latitude">Login to see contact</span>
+              <span *ngIf="d.latitude" class="text-sm">{{ d.latitude | number: '1.4-4' }}, {{ d.longitude | number: '1.4-4' }}</span>
+              <span *ngIf="!d.latitude" class="muted text-sm">Hidden</span>
             </td>
-            <td><button (click)="thank(d)" style="padding:4px 8px">Give Thanks</button></td>
+            <td><p-button label="Thank" icon="pi pi-heart" size="small" severity="secondary" [outlined]="true" (onClick)="thank(d)"></p-button></td>
           </tr>
-        </tbody>
-      </table>
-      <div *ngIf="result" style="margin-top:12px;display:flex;gap:8px;align-items:center">
-        <button (click)="prev()" [disabled]="filters.page<=1">Prev</button>
-        <span>Page {{result.page}} / {{result.totalPages}} ({{result.total}} total)</span>
-        <button (click)="next()" [disabled]="result.page>=result.totalPages">Next</button>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr><td colspan="6" class="text-center muted">No donors match. Try a wider radius.</td></tr>
+        </ng-template>
+      </p-table>
+      <div class="flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
+        <span class="muted text-sm">Page {{ result.page }} / {{ result.totalPages }} ({{ result.total }} total)</span>
+        <div class="flex gap-2">
+          <p-button label="Prev" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" size="small" [disabled]="filters.page <= 1" (onClick)="prev()"></p-button>
+          <p-button label="Next" icon="pi pi-arrow-right" iconPos="right" severity="secondary" [outlined]="true" size="small" [disabled]="result.page >= result.totalPages" (onClick)="next()"></p-button>
+        </div>
       </div>
-    </section>
+    </p-card>
+
+    <p-confirmDialog></p-confirmDialog>
   `,
+  styles: [
+    `
+      .page-title { margin: 0; font-size: 1.9rem; letter-spacing: -0.02em; }
+      .page-sub { margin: 0.2rem 0 1rem; color: #667085; }
+      .field label { display: block; margin-bottom: 0.4rem; }
+      .muted { color: #98a2b3; }
+    `,
+  ],
 })
 export class DonorsComponent implements OnInit {
   private http = inject(HttpClient);
-  private auth = inject(AuthService);
+  private errors = inject(ErrorHandlerService);
+  private cdr = inject(ChangeDetectorRef);
+
   bloodGroups: any[] = [];
+  radiusOptions = [
+    { label: '5 km', value: '5' },
+    { label: '10 km', value: '10' },
+    { label: '25 km', value: '25' },
+    { label: '50 km', value: '50' },
+    { label: '100 km', value: '100' },
+  ];
   loading = false;
   error = '';
   result: any = null;
-  filters: any = { bloodGroupId: '', city: '', area: '', pinCode: '', lat: '', lng: '', radiusKm: '', page: 1, pageSize: 20 };
+  filters: any = { bloodGroupId: '', city: '', area: '', pinCode: '', lat: null, lng: null, radiusKm: '', page: 1, pageSize: 20 };
 
   ngOnInit() {
-    this.http.get<any>('/api/master/blood-groups').subscribe((r) => (this.bloodGroups = r.data ?? r));
+    this.http.get<any>('/api/master/blood-groups').subscribe({
+      next: (r) => { this.bloodGroups = r.data ?? r; this.cdr.markForCheck(); },
+      error: () => {},
+    });
     this.search();
-    // Prefill lat/lng from own profile if authenticated
     this.http.get<any>('/api/users/me').subscribe({
       next: (r) => {
         const me = r.data ?? r;
-        if (me.latitude) { this.filters.lat = me.latitude; this.filters.lng = me.longitude; }
+        if (me?.latitude && this.filters.lat == null) {
+          this.filters.lat = me.latitude;
+          this.filters.lng = me.longitude;
+          this.cdr.markForCheck();
+        }
       },
       error: () => {},
     });
@@ -76,8 +141,8 @@ export class DonorsComponent implements OnInit {
     if (this.filters.city) p = p.set('city', this.filters.city);
     if (this.filters.area) p = p.set('area', this.filters.area);
     if (this.filters.pinCode) p = p.set('pinCode', this.filters.pinCode);
-    if (this.filters.lat) p = p.set('lat', String(this.filters.lat));
-    if (this.filters.lng) p = p.set('lng', String(this.filters.lng));
+    if (this.filters.lat != null && this.filters.lat !== '') p = p.set('lat', String(this.filters.lat));
+    if (this.filters.lng != null && this.filters.lng !== '') p = p.set('lng', String(this.filters.lng));
     if (this.filters.radiusKm) p = p.set('radiusKm', this.filters.radiusKm);
     p = p.set('page', String(this.filters.page));
     p = p.set('pageSize', String(this.filters.pageSize));
@@ -85,30 +150,56 @@ export class DonorsComponent implements OnInit {
   }
 
   search() {
-    this.loading = true; this.error='';
+    this.loading = true;
+    this.error = '';
+    this.cdr.markForCheck();
     this.http.get<any>('/api/donors', { params: this.buildParams() }).subscribe({
-      next: (r) => { this.result = r.data ?? r; this.loading=false; },
-      error: (e) => { this.error = e?.error?.error?.message ?? 'Search failed'; this.loading=false; },
+      next: (r) => { this.result = r.data ?? r; this.loading = false; this.cdr.markForCheck(); },
+      error: (e) => {
+        this.error = this.errors.getUserMessage(e);
+        this.errors.handleHttpError(e, 'Search failed');
+        this.loading = false;
+        this.cdr.markForCheck();
+      },
     });
   }
 
-  prev(){ if(this.filters.page>1){ this.filters.page--; this.search(); } }
-  next(){ if(this.result && this.filters.page<this.result.totalPages){ this.filters.page++; this.search(); } }
+  reset() {
+    this.filters = { bloodGroupId: '', city: '', area: '', pinCode: '', lat: null, lng: null, radiusKm: '', page: 1, pageSize: 20 };
+    this.search();
+  }
+
+  prev() { if (this.filters.page > 1) { this.filters.page--; this.search(); } }
+  next() { if (this.result && this.filters.page < this.result.totalPages) { this.filters.page++; this.search(); } }
 
   useMyLocation() {
-    if (!navigator.geolocation) { this.error='No geolocation'; return; }
-    navigator.geolocation.getCurrentPosition((pos)=>{
-      this.filters.lat = pos.coords.latitude.toFixed(6);
-      this.filters.lng = pos.coords.longitude.toFixed(6);
-      this.filters.radiusKm = '10';
-      this.search();
-    });
+    if (!navigator.geolocation) {
+      this.errors.showWarn('Geolocation is not supported by your browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        this.filters.lat = Number(pos.coords.latitude.toFixed(6));
+        this.filters.lng = Number(pos.coords.longitude.toFixed(6));
+        this.filters.radiusKm = '10';
+        this.cdr.markForCheck();
+        this.search();
+      },
+      () => this.errors.showWarn('Unable to get your location. Please allow location access.'),
+    );
   }
 
-  thank(donor: any) {
-    this.http.post<any>('/api/appreciations', { receiverUserId: donor.id, message: 'Thank you for being a donor!' }).subscribe({
-      next: ()=> alert('Thanks sent to ' + donor.displayName),
-      error: (e)=> alert(e?.error?.error?.message ?? 'Failed to thank'),
-    });
+  async thank(donor: any) {
+    try {
+      await firstValueFrom(
+        this.http.post<any>('/api/appreciations', {
+          receiverUserId: donor.id,
+          message: 'Thank you for being a donor!',
+        }),
+      );
+      this.errors.showSuccess(`Thanks sent to ${donor.displayName || donor.fullName || 'donor'}.`);
+    } catch (e) {
+      this.errors.handleHttpError(e as any, 'Failed to send thanks');
+    }
   }
 }

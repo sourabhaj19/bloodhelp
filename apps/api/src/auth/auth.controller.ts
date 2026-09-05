@@ -25,25 +25,20 @@ function getMeta(req: Request) {
   };
 }
 
-function setRefreshCookie(res: Response, token: string, req: Request) {
+function setRefreshCookie(res: Response, token: string, opts: { maxAgeMs?: number } = {}) {
   const isProd = process.env.NODE_ENV === 'production';
-  // Per §5: HttpOnly; Secure; SameSite=Strict; path=/api/auth; maxAge ~ refresh expiry
-  // request.secure or x-forwarded-proto may be needed behind proxy
-  res.cookie('refresh_token', token, {
+  // Per §5: HttpOnly; Secure; SameSite=Strict; path=/api/auth.
+  // With maxAgeMs → persistent cookie ("remember me"); without → session cookie
+  // that dies with the browser (short server-side TTL still enforced via expiresAt).
+  const base = {
     httpOnly: true,
     secure: isProd, // false in dev so localhost http works
-    sameSite: 'strict',
-    path: '/api/auth',
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30d — matches JWT_REFRESH_EXPIRES_IN default
-  });
+    sameSite: 'strict' as const,
+    ...(opts.maxAgeMs ? { maxAge: opts.maxAgeMs } : {}),
+  };
+  res.cookie('refresh_token', token, { ...base, path: '/api/auth' });
   // Also set same cookie on /api/v1/auth for dual prefix compat
-  res.cookie('refresh_token', token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: 'strict',
-    path: '/api/v1/auth',
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-  });
+  res.cookie('refresh_token', token, { ...base, path: '/api/v1/auth' });
 }
 
 function clearRefreshCookie(res: Response) {
@@ -61,7 +56,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Register a new USER account' })
   async register(@Body() dto: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.register(dto, getMeta(req));
-    setRefreshCookie(res, result.refreshToken, req);
+    setRefreshCookie(res, result.refreshToken, { maxAgeMs: 30 * 24 * 60 * 60 * 1000 });
     return {
       success: true,
       data: {
@@ -79,7 +74,9 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email or mobile' })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.login(dto, getMeta(req));
-    setRefreshCookie(res, result.refreshToken, req);
+    // rememberMe → persistent cookie matching the long refresh TTL;
+    // otherwise a session cookie (server still caps the session at the short TTL)
+    setRefreshCookie(res, result.refreshToken, result.rememberMe ? { maxAgeMs: result.refreshExpiresInMs } : {});
     return {
       success: true,
       data: {
@@ -102,7 +99,12 @@ export class AuthController {
     const headerToken = (req.headers['x-refresh-token'] as string | undefined);
     const presented = cookieToken || bodyToken || headerToken;
     const result = await this.auth.refresh(presented, getMeta(req));
-    setRefreshCookie(res, result.refreshToken, req);
+    // Preserve the persistence chosen at login: persistent cookie capped at the
+    // family's remaining lifetime, or a session cookie for short sessions.
+    const maxAgeMs = result.persistent
+      ? Math.max(0, result.refreshExpiresAt.getTime() - Date.now())
+      : undefined;
+    setRefreshCookie(res, result.refreshToken, { maxAgeMs });
     return {
       success: true,
       data: { accessToken: result.accessToken, expiresIn: 900, user: { id: result.user.id, role: result.user.role, email: result.user.email, firstName: result.user.firstName, lastName: result.user.lastName } },

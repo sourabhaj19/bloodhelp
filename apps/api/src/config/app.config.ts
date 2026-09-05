@@ -10,6 +10,8 @@ export default registerAs('app', () => ({
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'replace-with-at-least-32-random-bytes-refresh',
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+    // Short-lived refresh for logins WITHOUT "remember me" (session cookie)
+    refreshExpiresInShort: process.env.JWT_REFRESH_EXPIRES_IN_SHORT || '1d',
   },
   password: {
     resetExpiresIn: process.env.PASSWORD_RESET_EXPIRES_IN || '30m',

@@ -1,80 +1,224 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { ErrorHandlerService } from '../../core/services/error-handler.service';
+import { SharedUiModule } from '../../shared/shared-ui.module';
 
 @Component({
   standalone: true,
-  imports: [RouterLink, FormsModule, CommonModule],
+  imports: [RouterLink, SharedUiModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <main class="auth-shell" style="display:flex;justify-content:center;padding:24px">
-      <section class="auth-card" style="max-width:640px;width:100%;border:1px solid #e5e7eb;padding:24px;border-radius:12px">
-        <a routerLink="/">← Back</a>
-        <h1>Register</h1>
-        <p>All fields required. Location is captured via coordinates + address hierarchy.</p>
-        <form (ngSubmit)="register()" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
-          <label>First Name <input [(ngModel)]="form.firstName" name="firstName" required style="width:100%;padding:8px" /></label>
-          <label>Last Name <input [(ngModel)]="form.lastName" name="lastName" required style="width:100%;padding:8px" /></label>
-          <label>Date of Birth <input [(ngModel)]="form.dateOfBirth" name="dateOfBirth" type="date" required style="width:100%;padding:8px" /></label>
-          <label>Email <input [(ngModel)]="form.email" name="email" type="email" required style="width:100%;padding:8px" /></label>
-          <label>Blood Group
-            <select [(ngModel)]="form.bloodGroupId" name="bloodGroupId" required style="width:100%;padding:8px">
-              <option value="">Select</option>
-              <option *ngFor="let bg of bloodGroups" [value]="bg.id">{{bg.code}} — {{bg.label}}</option>
-            </select>
-          </label>
-          <label>Country Code
-            <select [(ngModel)]="form.countryCodeId" name="countryCodeId" required style="width:100%;padding:8px">
-              <option value="">Select</option>
-              <option *ngFor="let cc of countryCodes" [value]="cc.id">{{cc.label}}</option>
-            </select>
-          </label>
-          <label>Mobile <input [(ngModel)]="form.mobile" name="mobile" required placeholder="9876543210 or +919876543210" pattern="^(\\d{10}|\\+[1-9]\\d{7,14})$" style="width:100%;padding:8px" /></label>
-          <label>Password <input [(ngModel)]="form.password" name="password" type="password" required style="width:100%;padding:8px" /></label>
-          <label>Country
-            <select [(ngModel)]="form.countryId" name="countryId" required (ngModelChange)="onCountryChange()" style="width:100%;padding:8px">
-              <option value="">Select</option>
-              <option *ngFor="let c of countries" [value]="c.id">{{c.name}}</option>
-            </select>
-          </label>
-          <label>State
-            <select [(ngModel)]="form.stateId" name="stateId" required (ngModelChange)="onStateChange()" style="width:100%;padding:8px">
-              <option value="">Select</option>
-              <option *ngFor="let s of states" [value]="s.id">{{s.name}}</option>
-            </select>
-          </label>
-          <label>City
-            <select [(ngModel)]="form.cityId" name="cityId" required style="width:100%;padding:8px">
-              <option value="">Select</option>
-              <option *ngFor="let ci of cities" [value]="ci.id">{{ci.name}}</option>
-            </select>
-          </label>
-          <label>Area <input [(ngModel)]="form.area" name="area" required style="width:100%;padding:8px" /></label>
-          <label>Pin Code <input [(ngModel)]="form.pinCode" name="pinCode" required style="width:100%;padding:8px" /></label>
-          <label>Latitude <input [(ngModel)]="form.latitude" name="latitude" type="number" step="0.000001" required style="width:100%;padding:8px" /></label>
-          <label>Longitude <input [(ngModel)]="form.longitude" name="longitude" type="number" step="0.000001" required style="width:100%;padding:8px" /></label>
-          <div style="grid-column:1/-1;display:flex;gap:8px">
-            <button type="button" (click)="useMyLocation()" style="padding:8px 12px">Use my location (GPS)</button>
-            <button type="button" (click)="pickOnMap()" style="padding:8px 12px">Pick on map (approx: geocode area+city)</button>
+    <main class="auth-shell">
+      <p-card styleClass="register-card-ui">
+        <div class="text-center mb-3">
+          <span class="brand-badge"><i class="pi pi-heart-fill"></i></span>
+          <h1 class="auth-title">Become a donor</h1>
+          <p class="auth-sub">Create your BloodHelp account. All fields are required.</p>
+        </div>
+
+        <p-message *ngIf="error" severity="error" [text]="error" styleClass="w-full mb-3"></p-message>
+        <p-message *ngIf="success" severity="success" text="Registered! Redirecting…" styleClass="w-full mb-3"></p-message>
+
+        <p-steps [model]="steps" [activeIndex]="activeStep" styleClass="mb-4" [readonly]="false"></p-steps>
+
+        <form (ngSubmit)="register()" #regForm="ngForm">
+          <!-- STEP 1: Account -->
+          <div *ngIf="activeStep === 0" class="formgrid grid">
+            <div class="field col-12 md:col-6">
+              <label for="firstName">First name</label>
+              <input pInputText id="firstName" [(ngModel)]="form.firstName" name="firstName" required class="w-full" />
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="lastName">Last name</label>
+              <input pInputText id="lastName" [(ngModel)]="form.lastName" name="lastName" required class="w-full" />
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="dob">Date of birth</label>
+              <p-calendar
+                inputId="dob"
+                [(ngModel)]="dob"
+                name="dateOfBirth"
+                dateFormat="yy-mm-dd"
+                [showIcon]="true"
+                [maxDate]="maxDob"
+                placeholder="1995-06-15"
+                styleClass="w-full"
+                inputStyleClass="w-full"
+                required
+              ></p-calendar>
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="email">Email</label>
+              <input pInputText id="email" [(ngModel)]="form.email" name="email" type="email" required email class="w-full" placeholder="user@example.com" />
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="bloodGroup">Blood group</label>
+              <p-dropdown
+                inputId="bloodGroup"
+                [(ngModel)]="form.bloodGroupId"
+                name="bloodGroupId"
+                [options]="bloodGroups"
+                optionLabel="label"
+                optionValue="id"
+                placeholder="Select blood group"
+                [filter]="true"
+                styleClass="w-full"
+                required
+              ></p-dropdown>
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="password">Password</label>
+              <p-password
+                [(ngModel)]="form.password"
+                name="password"
+                inputId="password"
+                required
+                minlength="8"
+                placeholder="Min. 8 characters"
+                [toggleMask]="true"
+                styleClass="w-full"
+                inputStyleClass="w-full"
+              ></p-password>
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="cc">Country code</label>
+              <p-dropdown
+                inputId="cc"
+                [(ngModel)]="form.countryCodeId"
+                name="countryCodeId"
+                [options]="countryCodes"
+                optionLabel="label"
+                optionValue="id"
+                placeholder="Select dial code"
+                [filter]="true"
+                styleClass="w-full"
+                required
+              ></p-dropdown>
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="mobile">Mobile</label>
+              <input pInputText id="mobile" [(ngModel)]="form.mobile" name="mobile" required class="w-full" placeholder="9876543210" />
+              <small class="hint">10 digits or +&lt;country&gt;&lt;number&gt;</small>
+            </div>
           </div>
-          <div style="grid-column:1/-1">
-            <button type="submit" [disabled]="loading" style="background:#b42318;color:white;padding:10px 18px;border:none;border-radius:8px;width:100%">{{loading ? 'Creating...' : 'Create account'}}</button>
-            <p *ngIf="error" style="color:#b42318;margin-top:8px">{{error}}</p>
-            <p *ngIf="success" style="color:#067647;margin-top:8px">Registered! Redirecting...</p>
+
+          <!-- STEP 2: Location -->
+          <div *ngIf="activeStep === 1" class="formgrid grid">
+            <div class="field col-12 md:col-4">
+              <label for="country">Country</label>
+              <p-dropdown
+                inputId="country"
+                [(ngModel)]="form.countryId"
+                name="countryId"
+                [options]="countries"
+                optionLabel="name"
+                optionValue="id"
+                placeholder="Select country"
+                [filter]="true"
+                (onChange)="onCountryChange()"
+                styleClass="w-full"
+                required
+              ></p-dropdown>
+            </div>
+            <div class="field col-12 md:col-4">
+              <label for="state">State</label>
+              <p-dropdown
+                inputId="state"
+                [(ngModel)]="form.stateId"
+                name="stateId"
+                [options]="states"
+                optionLabel="name"
+                optionValue="id"
+                placeholder="Select state"
+                [filter]="true"
+                [disabled]="!form.countryId"
+                (onChange)="onStateChange()"
+                styleClass="w-full"
+                required
+              ></p-dropdown>
+            </div>
+            <div class="field col-12 md:col-4">
+              <label for="city">City</label>
+              <p-dropdown
+                inputId="city"
+                [(ngModel)]="form.cityId"
+                name="cityId"
+                [options]="cities"
+                optionLabel="name"
+                optionValue="id"
+                placeholder="Select city"
+                [filter]="true"
+                [disabled]="!form.stateId"
+                styleClass="w-full"
+                required
+              ></p-dropdown>
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="area">Area</label>
+              <input pInputText id="area" [(ngModel)]="form.area" name="area" required class="w-full" placeholder="Street / locality" />
+            </div>
+            <div class="field col-12 md:col-6">
+              <label for="pin">Pin code</label>
+              <input pInputText id="pin" [(ngModel)]="form.pinCode" name="pinCode" required class="w-full" placeholder="400001" />
+            </div>
+            <div class="field col-6">
+              <label for="lat">Latitude</label>
+              <p-inputNumber inputId="lat" [(ngModel)]="form.latitude" name="latitude" [minFractionDigits]="4" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full" required></p-inputNumber>
+            </div>
+            <div class="field col-6">
+              <label for="lng">Longitude</label>
+              <p-inputNumber inputId="lng" [(ngModel)]="form.longitude" name="longitude" [minFractionDigits]="4" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full" required></p-inputNumber>
+            </div>
+            <div class="col-12 flex flex-wrap gap-2">
+              <p-button type="button" label="Use my GPS location" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
+              <p-button type="button" label="Geocode area + city" icon="pi pi-globe" severity="secondary" [outlined]="true" (onClick)="pickOnMap()"></p-button>
+            </div>
+          </div>
+
+          <div class="flex justify-content-between mt-3">
+            <p-button *ngIf="activeStep === 1" type="button" label="Back" icon="pi pi-arrow-left" severity="secondary" [outlined]="true" (onClick)="activeStep = 0"></p-button>
+            <span *ngIf="activeStep === 0"></span>
+            <p-button *ngIf="activeStep === 0" type="button" label="Continue" icon="pi pi-arrow-right" iconPos="right" (onClick)="activeStep = 1" [disabled]="!stepOneValid()"></p-button>
+            <p-button *ngIf="activeStep === 1" type="submit" label="Create account" icon="pi pi-check" [loading]="loading" [disabled]="regForm.invalid || loading"></p-button>
           </div>
         </form>
-        <p style="margin-top:12px"><a routerLink="/login">Already have an account? Login</a></p>
-      </section>
+
+        <p class="text-center mt-3 mb-0">
+          Already have an account? <a routerLink="/login" class="link font-bold">Log in</a>
+        </p>
+      </p-card>
     </main>
   `,
+  styles: [
+    `
+      .register-card-ui { width: min(760px, 96vw); }
+      :host ::ng-deep .register-card-ui { border-radius: 18px; }
+      :host ::ng-deep .register-card-ui .p-card-body { padding: 1.75rem; }
+      .brand-badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 52px; height: 52px; border-radius: 16px;
+        background: rgba(180, 35, 24, 0.1); color: #b42318; font-size: 1.5rem;
+      }
+      .auth-title { margin: 0.6rem 0 0.15rem; font-size: 1.7rem; letter-spacing: -0.02em; }
+      .auth-sub { margin: 0; color: #667085; }
+      .field label { display: block; margin-bottom: 0.4rem; }
+      .hint { color: #98a2b3; }
+      .link { color: #b42318; font-weight: 600; }
+      .link:hover { text-decoration: underline; }
+    `,
+  ],
 })
 export class RegisterComponent implements OnInit {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private errors = inject(ErrorHandlerService);
+
+  steps = [{ label: 'Account' }, { label: 'Location' }];
+  activeStep = 0;
 
   bloodGroups: any[] = [];
   countryCodes: any[] = [];
@@ -85,11 +229,12 @@ export class RegisterComponent implements OnInit {
   loading = false;
   error = '';
   success = false;
+  dob: Date | null = new Date('1995-06-15');
+  maxDob = new Date();
 
   form: any = {
     firstName: '',
     lastName: '',
-    dateOfBirth: '1995-06-15',
     email: '',
     countryCodeId: '',
     mobile: '',
@@ -100,7 +245,7 @@ export class RegisterComponent implements OnInit {
     cityId: '',
     area: '',
     pinCode: '',
-    latitude: 19.0760,
+    latitude: 19.076,
     longitude: 72.8777,
   };
 
@@ -108,77 +253,133 @@ export class RegisterComponent implements OnInit {
     this.loadMaster();
   }
 
-  loadMaster() {
-    this.http.get<any>('/api/master/blood-groups').subscribe((r) => (this.bloodGroups = r.data ?? r));
-    this.http.get<any>('/api/master/country-codes').subscribe((r) => (this.countryCodes = r.data ?? r));
-    this.http.get<any>('/api/master/countries').subscribe((r) => {
-      this.countries = r.data ?? r;
-    });
+  async loadMaster() {
+    try {
+      const [bg, cc, co] = await Promise.all([
+        firstValueFrom(this.http.get<any>('/api/master/blood-groups')),
+        firstValueFrom(this.http.get<any>('/api/master/country-codes')),
+        firstValueFrom(this.http.get<any>('/api/master/countries')),
+      ]);
+      this.bloodGroups = (bg.data ?? bg).map((b: any) => ({
+        ...b,
+        label: b.label ? `${b.code} — ${b.label}` : b.code,
+      }));
+      this.countryCodes = cc.data ?? cc;
+      this.countries = co.data ?? co;
+    } catch (e) {
+      this.error = this.errors.getUserMessage(e);
+      this.errors.handleHttpError(e as any, 'Failed to load form data');
+    }
   }
 
-  onCountryChange() {
+  stepOneValid(): boolean {
+    return !!(
+      this.form.firstName?.trim() &&
+      this.form.lastName?.trim() &&
+      this.form.email?.trim() &&
+      this.form.password?.length >= 8 &&
+      this.form.bloodGroupId &&
+      this.form.countryCodeId &&
+      this.form.mobile?.trim() &&
+      this.dob
+    );
+  }
+
+  async onCountryChange() {
     this.states = [];
     this.cities = [];
     this.form.stateId = '';
     this.form.cityId = '';
     if (!this.form.countryId) return;
-    this.http.get<any>(`/api/master/countries/${this.form.countryId}/states`).subscribe((r) => (this.states = r.data ?? r));
+    try {
+      const r = await firstValueFrom(
+        this.http.get<any>(`/api/master/countries/${this.form.countryId}/states`),
+      );
+      this.states = r.data ?? r;
+    } catch (e) {
+      this.errors.handleHttpError(e as any, 'Failed to load states');
+    }
   }
-  onStateChange() {
+
+  async onStateChange() {
     this.cities = [];
     this.form.cityId = '';
     if (!this.form.stateId) return;
-    this.http.get<any>(`/api/master/states/${this.form.stateId}/cities`).subscribe((r) => (this.cities = r.data ?? r));
+    try {
+      const r = await firstValueFrom(
+        this.http.get<any>(`/api/master/states/${this.form.stateId}/cities`),
+      );
+      this.cities = r.data ?? r;
+    } catch (e) {
+      this.errors.handleHttpError(e as any, 'Failed to load cities');
+    }
   }
 
   useMyLocation() {
     if (!navigator.geolocation) {
-      this.error = 'Geolocation not supported';
+      this.errors.showWarn('Geolocation is not supported by your browser.');
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         this.form.latitude = Number(pos.coords.latitude.toFixed(6));
         this.form.longitude = Number(pos.coords.longitude.toFixed(6));
+        this.errors.showSuccess('GPS location captured.');
       },
-      () => (this.error = 'Unable to get location'),
+      () => this.errors.showWarn('Unable to get your location. Please allow location access.'),
     );
   }
 
-  pickOnMap() {
-    // Simple forward geocode via API (MapLocationPickerComponent option 3)
-    const q = `${this.form.area}, ${this.cities.find((c) => c.id === this.form.cityId)?.name ?? ''}, ${this.states.find((s) => s.id === this.form.stateId)?.name ?? ''}`;
-    if (!q.trim()) {
-      this.error = 'Enter area/city/state first';
+  async pickOnMap() {
+    const city = this.cities.find((c) => c.id === this.form.cityId)?.name ?? '';
+    const state = this.states.find((s) => s.id === this.form.stateId)?.name ?? '';
+    const q = `${this.form.area}, ${city}, ${state}`.trim().replace(/^,|,$/g, '');
+    if (!this.form.area?.trim()) {
+      this.errors.showWarn('Enter area / city / state first.');
       return;
     }
-    this.http.get<any>('/api/geocoding/forward', { params: { address: q } }).subscribe({
-      next: (r) => {
-        const items = r.data ?? r;
-        if (items && items.length) {
-          this.form.latitude = items[0].latitude;
-          this.form.longitude = items[0].longitude;
-        } else this.error = 'Geocoding provider not configured or no result';
-      },
-      error: () => (this.error = 'Geocoding failed'),
-    });
+    try {
+      const r: any = await firstValueFrom(
+        this.http.get<any>('/api/geocoding/forward', { params: { address: q } }),
+      );
+      const items = r.data ?? r;
+      if (items?.length) {
+        this.form.latitude = items[0].latitude;
+        this.form.longitude = items[0].longitude;
+        this.errors.showSuccess('Location approximated from address.');
+      } else {
+        this.errors.showWarn('No geocoding result. You can still adjust coordinates manually.');
+      }
+    } catch (e) {
+      this.errors.handleHttpError(e as any, 'Geocoding failed');
+    }
   }
 
   async register() {
     this.error = '';
+    if (!this.dob) {
+      this.error = 'Please select your date of birth.';
+      return;
+    }
     this.loading = true;
     try {
-      // Convert string numbers
-      const payload = { ...this.form, latitude: Number(this.form.latitude), longitude: Number(this.form.longitude) };
+      const payload = {
+        ...this.form,
+        dateOfBirth: this.dob instanceof Date ? this.dob.toISOString().slice(0, 10) : this.dob,
+        latitude: Number(this.form.latitude),
+        longitude: Number(this.form.longitude),
+      };
       await this.auth.register(payload);
       this.success = true;
+      this.errors.showSuccess('Account created. Welcome to BloodHelp!');
       const u = this.auth.user();
       setTimeout(() => {
         if (u?.role === 'ADMIN') this.router.navigate(['/admin/dashboard']);
         else this.router.navigate(['/dashboard']);
       }, 600);
     } catch (e: any) {
-      this.error = e?.error?.error?.message ?? e?.error?.message ?? JSON.stringify(e?.error?.details ?? 'Registration failed');
+      this.error = this.errors.getUserMessage(e);
+      this.errors.handleHttpError(e, 'Registration failed');
     } finally {
       this.loading = false;
     }

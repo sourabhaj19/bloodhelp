@@ -34,9 +34,13 @@ export class AuthService {
     this._user.set(null);
   }
 
-  async login(identifier: string, password: string): Promise<void> {
+  async login(identifier: string, password: string, rememberMe = false): Promise<void> {
     const res: any = await firstValueFrom(
-      this.http.post('/api/auth/login', { identifier, password }, { withCredentials: true }),
+      this.http.post(
+        '/api/auth/login',
+        { identifier, password, rememberMe },
+        { withCredentials: true },
+      ),
     );
     const data = res.data ?? res;
     this.setSession(data.accessToken, data.user);
