@@ -144,10 +144,11 @@ export class MasterDataService {
   }
 
   // ── Cities ─────────────────────────────────────────────────────────────
-  listCities(stateId?: string, activeOnly = false) {
+  listCities(stateId?: string, activeOnly = false, countryId?: string) {
     return this.prisma.city.findMany({
       where: {
         ...(stateId ? { stateId } : {}),
+        ...(countryId ? { state: { countryId } } : {}),
         ...(activeOnly ? { active: true } : {}),
       },
       orderBy: { name: 'asc' },

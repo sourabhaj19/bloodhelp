@@ -4,6 +4,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
 @Component({
+  selector: 'app-profile-editor',
   standalone: true,
   imports: [SharedUiModule],
   changeDetection: ChangeDetectionStrategy.OnPush,

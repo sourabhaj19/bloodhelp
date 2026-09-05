@@ -26,6 +26,7 @@ import { RadioButtonModule } from 'primeng/radiobutton';
 import { DialogModule } from 'primeng/dialog';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TabViewModule } from 'primeng/tabview';
+import { TabMenuModule } from 'primeng/tabmenu';
 import { AccordionModule } from 'primeng/accordion';
 import { FieldsetModule } from 'primeng/fieldset';
 import { PanelModule } from 'primeng/panel';
@@ -74,6 +75,7 @@ import { InputSwitchModule } from 'primeng/inputswitch';
     DialogModule,
     ConfirmDialogModule,
     TabViewModule,
+    TabMenuModule,
     AccordionModule,
     FieldsetModule,
     PanelModule,
@@ -121,6 +123,7 @@ import { InputSwitchModule } from 'primeng/inputswitch';
     DialogModule,
     ConfirmDialogModule,
     TabViewModule,
+    TabMenuModule,
     AccordionModule,
     FieldsetModule,
     PanelModule,

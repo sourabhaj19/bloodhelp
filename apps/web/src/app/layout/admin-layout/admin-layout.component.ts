@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
+import { MenuItem } from 'primeng/api';
 import { AuthService } from '../../core/services/auth.service';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 import { SharedUiModule } from '../../shared/shared-ui.module';
@@ -18,9 +20,12 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/admin/dashboard" routerLinkActive="active">Dashboard</a>
         <a routerLink="/admin/users" routerLinkActive="active">Users</a>
         <a routerLink="/admin/reports" routerLinkActive="active">Reports</a>
-        <a routerLink="/admin/master-data/blood-groups" routerLinkActive="active">Master data</a>
-        <a routerLink="/profile" routerLinkActive="active">My profile</a>
+        <button type="button" class="nav-drop" [class.active]="isMasterData" (click)="mdMenu.toggle($event)">
+          Master data <i class="pi pi-chevron-down ml-1"></i>
+        </button>
+        <a routerLink="/admin/profile" routerLinkActive="active">My profile</a>
       </nav>
+      <p-menu #mdMenu [model]="mdItems" [popup]="true"></p-menu>
       <div class="topbar-actions">
         <p-button icon="pi pi-sign-out" severity="secondary" [text]="true" [rounded]="true" (onClick)="logout()" pTooltip="Logout" tooltipPosition="bottom" styleClass="hide-sm admin-ghost"></p-button>
         <p-button icon="pi pi-bars" severity="secondary" [outlined]="true" styleClass="mobile-btn" (onClick)="sidebar = true" ariaLabel="Open menu"></p-button>
@@ -38,7 +43,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/admin/master-data/country-codes" routerLinkActive="active" (click)="sidebar = false" class="side-link">Country codes</a>
         <a routerLink="/admin/master-data/states" routerLinkActive="active" (click)="sidebar = false" class="side-link">States</a>
         <a routerLink="/admin/master-data/cities" routerLinkActive="active" (click)="sidebar = false" class="side-link">Cities</a>
-        <a routerLink="/profile" routerLinkActive="active" (click)="sidebar = false" class="side-link">My profile</a>
+        <a routerLink="/admin/profile" routerLinkActive="active" (click)="sidebar = false" class="side-link">My profile</a>
         <p-divider></p-divider>
         <p-button label="Logout" icon="pi pi-sign-out" severity="secondary" [outlined]="true" styleClass="w-full" (onClick)="logout()"></p-button>
       </div>
@@ -55,15 +60,50 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
       .desktop-nav.dark a { color: #d4d4d8; }
       .desktop-nav.dark a:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
       .desktop-nav.dark a.active { background: #b42318; color: #fff; }
+      .nav-drop {
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        padding: 9px 14px;
+        border-radius: 10px;
+        color: #d4d4d8;
+        font-weight: 600;
+        font-size: 0.93rem;
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+      }
+      .nav-drop:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+      .nav-drop.active { background: #b42318; color: #fff; }
+      .nav-drop .pi { font-size: 0.7rem; }
       :host ::ng-deep .admin-ghost { color: #e4e4e7 !important; }
     `,
   ],
 })
-export class AdminLayoutComponent {
+export class AdminLayoutComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
   private toast = inject(ErrorHandlerService);
+  private cdr = inject(ChangeDetectorRef);
+
   sidebar = false;
+  isMasterData = false;
+
+  mdItems: MenuItem[] = [
+    { label: 'Blood groups', icon: 'pi pi-heart', routerLink: '/admin/master-data/blood-groups' },
+    { label: 'Country codes', icon: 'pi pi-phone', routerLink: '/admin/master-data/country-codes' },
+    { label: 'Countries', icon: 'pi pi-globe', routerLink: '/admin/master-data/countries' },
+    { label: 'States', icon: 'pi pi-map', routerLink: '/admin/master-data/states' },
+    { label: 'Cities', icon: 'pi pi-building', routerLink: '/admin/master-data/cities' },
+  ];
+
+  ngOnInit() {
+    this.isMasterData = this.router.url.startsWith('/admin/master-data');
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe((e) => {
+      this.isMasterData = (e as NavigationEnd).urlAfterRedirects.startsWith('/admin/master-data');
+      this.cdr.markForCheck();
+    });
+  }
 
   async logout() {
     this.sidebar = false;

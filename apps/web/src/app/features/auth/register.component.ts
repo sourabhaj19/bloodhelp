@@ -65,6 +65,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
                 optionValue="id"
                 placeholder="Select blood group"
                 [filter]="true"
+                [appendTo]="'body'"
                 styleClass="w-full"
                 required
               ></p-dropdown>
@@ -94,6 +95,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
                 optionValue="id"
                 placeholder="Select dial code"
                 [filter]="true"
+                [appendTo]="'body'"
                 styleClass="w-full"
                 required
               ></p-dropdown>
@@ -118,6 +120,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
                 optionValue="id"
                 placeholder="Select country"
                 [filter]="true"
+                [appendTo]="'body'"
                 (onChange)="onCountryChange()"
                 styleClass="w-full"
                 required
@@ -134,6 +137,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
                 optionValue="id"
                 placeholder="Select state"
                 [filter]="true"
+                [appendTo]="'body'"
                 [disabled]="!form.countryId"
                 (onChange)="onStateChange()"
                 styleClass="w-full"
@@ -151,6 +155,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
                 optionValue="id"
                 placeholder="Select city"
                 [filter]="true"
+                [appendTo]="'body'"
                 [disabled]="!form.stateId"
                 styleClass="w-full"
                 required

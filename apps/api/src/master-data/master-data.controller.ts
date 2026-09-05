@@ -135,6 +135,22 @@ export class MasterDataController {
 
   // ── States / Cities (admin creates via country/state context) ─────
   @Public()
+  @Get('states')
+  @ApiOperation({ summary: 'List all states (public), optional ?countryId= filter' })
+  listAllStates(@Query('countryId') countryId?: string) {
+    return this.service.listStates(countryId || undefined).then((data) => ({ success: true, data, message: 'States fetched' }));
+  }
+
+  @Public()
+  @Get('cities')
+  @ApiOperation({ summary: 'List all cities (public), optional ?stateId= & ?countryId= filters' })
+  listAllCities(@Query('stateId') stateId?: string, @Query('countryId') countryId?: string) {
+    return this.service
+      .listCities(stateId || undefined, false, countryId || undefined)
+      .then((data) => ({ success: true, data, message: 'Cities fetched' }));
+  }
+
+  @Public()
   @Get('states/:stateId/cities')
   listCitiesForState(@Param('stateId') stateId: string) {
     return this.service.listCities(stateId).then((data) => ({ success: true, data, message: 'Cities fetched' }));

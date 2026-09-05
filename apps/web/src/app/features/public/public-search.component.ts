@@ -17,7 +17,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         <div class="formgrid grid">
           <div class="field col-12 md:col-3">
             <label for="bg">Blood group</label>
-            <p-dropdown inputId="bg" [(ngModel)]="filters.bloodGroupId" [options]="bloodGroups" optionLabel="code" optionValue="id" placeholder="All groups" [showClear]="true" styleClass="w-full"></p-dropdown>
+            <p-dropdown inputId="bg" [(ngModel)]="filters.bloodGroupId" [options]="bloodGroups" optionLabel="code" optionValue="id" placeholder="All groups" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
           </div>
           <div class="field col-12 md:col-3">
             <label for="city">City</label>
@@ -29,7 +29,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           </div>
           <div class="field col-12 md:col-3">
             <label for="radius">Radius</label>
-            <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" styleClass="w-full"></p-dropdown>
+            <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
           </div>
           <div class="field col-6 md:col-3">
             <label for="lat">Latitude</label>
