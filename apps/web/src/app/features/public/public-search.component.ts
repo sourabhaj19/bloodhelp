@@ -39,7 +39,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             <label for="lng">Longitude</label>
             <p-inputNumber inputId="lng" [(ngModel)]="filters.lng" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full" placeholder="72.8777"></p-inputNumber>
           </div>
-          <div class="col-12 md:col-6 flex align-items-end gap-2">
+          <div class="col-12 md:col-6 flex align-items-center gap-2">
             <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
             <p-button label="Reset" severity="secondary" [outlined]="true" (onClick)="reset()"></p-button>
           </div>

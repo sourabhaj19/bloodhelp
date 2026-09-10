@@ -11,7 +11,8 @@
     "build:web": "npm --prefix apps/web run build",
     "test": "npm run test:api && npm run test:web",
     "test:api": "npm --prefix apps/api run test",
-    "test:web": "npm --prefix apps/web run test"
+    "test:web": "npm --prefix apps/web run test",
+    "seed": "npm --prefix apps/api run seed"
   },
   "engines": {
     "node": ">=20.19.0"

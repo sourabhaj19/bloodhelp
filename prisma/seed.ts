@@ -1,4 +1,36 @@
+// NOTE: no tsconfig in the repo includes prisma/, so editors typecheck this
+// file without @types/node. The ambient declarations below keep it clean
+// without that package (ts-node runs with --transpile-only, no typecheck).
+// At runtime Node provides the real values; these are compile-time only.
+declare const require: (id: string) => any;
+declare const __dirname: string;
+declare const process: { env: Record<string, string | undefined>; exit(code: number): never };
+
 import { PrismaClient } from '@prisma/client';
+import { INDIAN_CITIES, INDIAN_STATES, INDIA_COUNTRY, INDIA_COUNTRY_CODE } from './data/india';
+
+const path = require('path') as {
+  join(...parts: string[]): string;
+  resolve(...parts: string[]): string;
+};
+const fs = require('fs') as { existsSync(p: string): boolean };
+const { createRequire } = require('module') as {
+  createRequire(path: string): (pkg: string) => any;
+};
+
+// ts-node does not auto-load .env (unlike `prisma migrate`), and this file
+// lives in <root>/prisma while .env lives in <root> — so load it explicitly.
+// dotenv is resolved via apps/api (same pattern as the argon2 fallback below).
+if (!process.env.DATABASE_URL) {
+  try {
+    const requireFromApi = createRequire(path.join(__dirname, '..', 'apps', 'api', 'package.json'));
+    const dotenv = requireFromApi('dotenv') as { config(opts: { path: string }): void };
+    const envPath = path.resolve(__dirname, '..', '.env');
+    if (fs.existsSync(envPath)) dotenv.config({ path: envPath });
+  } catch {
+    // dotenv unavailable — rely on DATABASE_URL already being in the environment.
+  }
+}
 
 const prisma = new PrismaClient();
 
@@ -25,104 +57,91 @@ async function main() {
   }
   console.log('  BloodGroups seeded');
 
-  // Countries
+  // ── Country: India only ──────────────────────────────────────
   const india = await prisma.country.upsert({
-    where: { isoCode2: 'IN' },
-    update: { name: 'India', active: true },
-    create: { name: 'India', isoCode2: 'IN', active: true },
+    where: { isoCode2: INDIA_COUNTRY.isoCode2 },
+    update: { name: INDIA_COUNTRY.name, active: true },
+    create: { name: INDIA_COUNTRY.name, isoCode2: INDIA_COUNTRY.isoCode2, active: true },
   });
-  const usa = await prisma.country.upsert({
-    where: { isoCode2: 'US' },
-    update: { name: 'United States', active: true },
-    create: { name: 'United States', isoCode2: 'US', active: true },
+  // Deactivate any legacy non-India countries (e.g. US from earlier seeds)
+  // instead of deleting — FKs (states/users) use Restrict.
+  await prisma.country.updateMany({
+    where: { id: { not: india.id } },
+    data: { active: false },
   });
-  console.log('  Countries seeded');
+  console.log('  Country seeded: India (IN)');
 
-  // Country Codes
-  await prisma.countryCode.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000001' },
-    update: {},
-    create: {
-      id: '00000000-0000-0000-0000-000000000001',
-      countryId: india.id,
-      dialCode: '+91',
-      label: 'India (+91)',
-      active: true,
-    },
-  }).catch(async () => {
-    const existing = await prisma.countryCode.findFirst({ where: { dialCode: '+91' } });
-    if (!existing) {
-      await prisma.countryCode.create({
-        data: { countryId: india.id, dialCode: '+91', label: 'India (+91)' },
-      });
+  // ── Country Code: +91 only ───────────────────────────────────
+  const existingCc = await prisma.countryCode.findFirst({
+    where: { dialCode: INDIA_COUNTRY_CODE.dialCode },
+  });
+  if (existingCc) {
+    await prisma.countryCode.update({
+      where: { id: existingCc.id },
+      data: {
+        countryId: india.id,
+        label: INDIA_COUNTRY_CODE.label,
+        active: true,
+      },
+    });
+  } else {
+    await prisma.countryCode.create({
+      data: {
+        countryId: india.id,
+        dialCode: INDIA_COUNTRY_CODE.dialCode,
+        label: INDIA_COUNTRY_CODE.label,
+        active: true,
+      },
+    });
+  }
+  // Deactivate any other dial codes from earlier seeds.
+  await prisma.countryCode.updateMany({
+    where: { dialCode: { not: INDIA_COUNTRY_CODE.dialCode } },
+    data: { active: false },
+  });
+  console.log('  CountryCode seeded: India (+91)');
+
+  // ── States: 28 States + 8 UTs ────────────────────────────────
+  const stateIdByName = new Map<string, string>();
+  for (const name of INDIAN_STATES) {
+    const state = await prisma.state.upsert({
+      where: { countryId_name: { countryId: india.id, name } },
+      update: { active: true },
+      create: { countryId: india.id, name, active: true },
+    });
+    stateIdByName.set(name, state.id);
+  }
+  // Deactivate stale states no longer in the master list (rename-safe:
+  // keeps rows + FKs, just hides from dropdowns which filter active=true).
+  await prisma.state.updateMany({
+    where: { countryId: india.id, name: { notIn: INDIAN_STATES } },
+    data: { active: false },
+  });
+  console.log(`  States seeded: ${stateIdByName.size}`);
+
+  // ── Cities (per state) ───────────────────────────────────────
+  let cityCount = 0;
+  for (const [stateName, cities] of Object.entries(INDIAN_CITIES)) {
+    const stateId = stateIdByName.get(stateName);
+    if (!stateId) {
+      console.warn(`  ! State "${stateName}" not found, skipping its cities`);
+      continue;
     }
-  });
-  await prisma.countryCode.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000002' },
-    update: {},
-    create: {
-      id: '00000000-0000-0000-0000-000000000002',
-      countryId: usa.id,
-      dialCode: '+1',
-      label: 'United States (+1)',
-      active: true,
-    },
-  }).catch(async () => {
-    const existing = await prisma.countryCode.findFirst({ where: { dialCode: '+1' } });
-    if (!existing) {
-      await prisma.countryCode.create({
-        data: { countryId: usa.id, dialCode: '+1', label: 'United States (+1)' },
+    for (const name of cities) {
+      await prisma.city.upsert({
+        where: { stateId_name: { stateId, name } },
+        update: { active: true },
+        create: { stateId, name, active: true },
       });
+      cityCount++;
     }
-  });
-  console.log('  CountryCodes seeded');
-
-  // States — India
-  const maharashtra = await prisma.state.upsert({
-    where: { countryId_name: { countryId: india.id, name: 'Maharashtra' } },
-    update: {},
-    create: { countryId: india.id, name: 'Maharashtra', active: true },
-  });
-  const karnataka = await prisma.state.upsert({
-    where: { countryId_name: { countryId: india.id, name: 'Karnataka' } },
-    update: {},
-    create: { countryId: india.id, name: 'Karnataka', active: true },
-  });
-  const delhi = await prisma.state.upsert({
-    where: { countryId_name: { countryId: india.id, name: 'Delhi' } },
-    update: {},
-    create: { countryId: india.id, name: 'Delhi', active: true },
-  });
-  // US states
-  await prisma.state.upsert({
-    where: { countryId_name: { countryId: usa.id, name: 'California' } },
-    update: {},
-    create: { countryId: usa.id, name: 'California', active: true },
-  });
-  console.log('  States seeded');
-
-  // Cities
-  await prisma.city.upsert({
-    where: { stateId_name: { stateId: maharashtra.id, name: 'Mumbai' } },
-    update: {},
-    create: { stateId: maharashtra.id, name: 'Mumbai', active: true },
-  });
-  await prisma.city.upsert({
-    where: { stateId_name: { stateId: maharashtra.id, name: 'Pune' } },
-    update: {},
-    create: { stateId: maharashtra.id, name: 'Pune', active: true },
-  });
-  await prisma.city.upsert({
-    where: { stateId_name: { stateId: karnataka.id, name: 'Bengaluru' } },
-    update: {},
-    create: { stateId: karnataka.id, name: 'Bengaluru', active: true },
-  });
-  await prisma.city.upsert({
-    where: { stateId_name: { stateId: delhi.id, name: 'New Delhi' } },
-    update: {},
-    create: { stateId: delhi.id, name: 'New Delhi', active: true },
-  });
-  console.log('  Cities seeded');
+    // Deactivate stale cities for this state (same rename-safe approach).
+    await prisma.city.updateMany({
+      where: { stateId, name: { notIn: cities } },
+      data: { active: false },
+    });
+  }
+  console.log(`  Cities seeded: ${cityCount}`);
 
   // Report Reasons
   const reasons = [
@@ -234,12 +253,9 @@ async function main() {
     // a bare import may not resolve — fall back to requiring it via apps/api.
     let argon2: any;
     try {
-      // @ts-ignore
-      argon2 = await import('argon2');
+      argon2 = require('argon2');
     } catch {
-      const { createRequire } = await import('module');
-      const { join } = await import('path');
-      const requireFromApi = createRequire(join(__dirname, '..', 'apps', 'api', 'package.json'));
+      const requireFromApi = createRequire(path.join(__dirname, '..', 'apps', 'api', 'package.json'));
       argon2 = requireFromApi('argon2');
     }
     const adminHash = await (argon2 as any).hash('Admin!12345678', { type: (argon2 as any).argon2id });
