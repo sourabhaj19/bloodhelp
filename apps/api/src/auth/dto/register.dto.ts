@@ -8,6 +8,8 @@ import {
   MaxLength,
   Matches,
   IsNumber,
+  Min,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -29,15 +31,16 @@ export class RegisterDto {
   @IsEmail() @MaxLength(254)
   email!: string;
 
-  @ApiProperty({ example: 'uuid-country-code-id' })
+  @ApiPropertyOptional({ example: 'uuid-country-code-id', description: 'Resolved automatically from countryId when omitted' })
+  @IsOptional()
   @IsString() // allow UUID string, validated further in service against DB
-  countryCodeId!: string;
+  countryCodeId?: string;
 
-  @ApiProperty({ example: '9876543210', description: '10 digit mobile or E.164 (+919876543210)' })
-  @IsString() @Matches(/^(\d{10}|\+[1-9]\d{7,14})$/, { message: 'mobile must be 10 digit number or valid E.164 format' })
+  @ApiProperty({ example: '9876543210', description: '10 digit mobile number (no country prefix — dial code is derived from country)' })
+  @IsString() @Matches(/^\d{10}$/, { message: 'mobile must be a 10 digit number' })
   mobile!: string;
 
-  @ApiProperty({ example: 'Str0ng!Pass123' })
+  @ApiProperty({ example: 'Str0ng!Pass' })
   @IsString() @MinLength(8) @MaxLength(128)
   password!: string;
 
@@ -62,16 +65,18 @@ export class RegisterDto {
   area!: string;
 
   @ApiProperty({ example: '400069' })
-  @IsString() @MaxLength(20)
+  @IsString() @Matches(/^[0-9]{6}$/, { message: 'pinCode must be a 6 digit number' })
   pinCode!: string;
 
   @ApiProperty({ example: 19.0760 })
   @Type(() => Number)
   @IsNumber({}, { message: 'latitude must be a number' })
+  @Min(-90) @Max(90)
   latitude!: number;
 
   @ApiProperty({ example: 72.8777 })
   @Type(() => Number)
   @IsNumber({}, { message: 'longitude must be a number' })
+  @Min(-180) @Max(180)
   longitude!: number;
 }

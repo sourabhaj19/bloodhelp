@@ -108,10 +108,22 @@ export class AuthService {
     const errors = validatePasswordPolicy(dto.password, policy);
     if (errors.length) throw new BadRequestException({ code: 'PASSWORD_POLICY', message: errors.join('; '), details: errors });
 
+    // Resolve country code from country when the client omits it
+    // (new single-form UI sends no country-code input).
+    let countryCodeId = dto.countryCodeId;
+    if (!countryCodeId && dto.countryId) {
+      const resolved =
+        (await this.prisma.countryCode.findFirst({
+          where: { countryId: dto.countryId, active: true },
+          orderBy: { dialCode: 'asc' },
+        })) ?? (await this.prisma.countryCode.findFirst({ orderBy: { dialCode: 'asc' } }));
+      countryCodeId = resolved?.id;
+    }
+
     // Validate FKs exist and active
     const [bloodGroup, countryCode, country, state, city] = await Promise.all([
       this.prisma.bloodGroup.findUnique({ where: { id: dto.bloodGroupId } }),
-      this.prisma.countryCode.findUnique({ where: { id: dto.countryCodeId } }),
+      countryCodeId ? this.prisma.countryCode.findUnique({ where: { id: countryCodeId } }) : Promise.resolve(null),
       this.prisma.country.findUnique({ where: { id: dto.countryId } }),
       this.prisma.state.findUnique({ where: { id: dto.stateId } }),
       this.prisma.city.findUnique({ where: { id: dto.cityId } }),
@@ -137,7 +149,7 @@ export class AuthService {
         lastName: dto.lastName,
         dateOfBirth: new Date(dto.dateOfBirth),
         email: dto.email.toLowerCase(),
-        countryCodeId: dto.countryCodeId,
+        countryCodeId: countryCodeId!,
         mobile: dto.mobile,
         passwordHash,
         bloodGroupId: dto.bloodGroupId,

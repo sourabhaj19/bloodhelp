@@ -15,10 +15,10 @@ export default registerAs('app', () => ({
   },
   password: {
     resetExpiresIn: process.env.PASSWORD_RESET_EXPIRES_IN || '30m',
-    minLength: parseInt(process.env.PASSWORD_MIN_LENGTH || '12', 10),
+    minLength: parseInt(process.env.PASSWORD_MIN_LENGTH || '8', 10),
     requireUppercase: process.env.PASSWORD_REQUIRE_UPPERCASE !== 'false',
-    requireLowercase: process.env.PASSWORD_REQUIRE_LOWERCASE !== 'false',
-    requireNumber: process.env.PASSWORD_REQUIRE_NUMBER !== 'false',
+    requireLowercase: process.env.PASSWORD_REQUIRE_LOWERCASE === 'true',
+    requireNumber: process.env.PASSWORD_REQUIRE_NUMBER === 'true',
     requireSpecial: process.env.PASSWORD_REQUIRE_SPECIAL_CHARACTER !== 'false',
   },
   email: {

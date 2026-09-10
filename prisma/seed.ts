@@ -247,7 +247,7 @@ async function main() {
   console.log('  EmailTemplates seeded');
 
   // Admin user (for Phase 4 / Phase 9 demo) — credentials: admin@bloodhelp.local / Admin!12345678
-  // Password policy min 12, so 14 chars with upper/lower/number/special
+  // Password policy: min 8 with uppercase + special, so 14 chars is safe
   try {
     // argon2 lives in apps/api/node_modules; seed.ts sits at the repo root, so
     // a bare import may not resolve — fall back to requiring it via apps/api.

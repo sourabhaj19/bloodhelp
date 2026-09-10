@@ -10,10 +10,10 @@ export interface PasswordPolicy {
 
 export function getPasswordPolicy(config: ConfigService): PasswordPolicy {
   return {
-    minLength: config.get<number>('app.password.minLength', 12)!,
+    minLength: config.get<number>('app.password.minLength', 8)!,
     requireUppercase: config.get<boolean>('app.password.requireUppercase', true)!,
-    requireLowercase: config.get<boolean>('app.password.requireLowercase', true)!,
-    requireNumber: config.get<boolean>('app.password.requireNumber', true)!,
+    requireLowercase: config.get<boolean>('app.password.requireLowercase', false)!,
+    requireNumber: config.get<boolean>('app.password.requireNumber', false)!,
     requireSpecial: config.get<boolean>('app.password.requireSpecial', true)!,
   };
 }

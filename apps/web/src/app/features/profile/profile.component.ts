@@ -119,8 +119,8 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           </div>
           <div class="field mb-0">
             <label for="npw">New password</label>
-            <p-password [(ngModel)]="pw.next" name="next" inputId="npw" required minlength="8" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" autocomplete="new-password"></p-password>
-            <small class="hint">Min. 8 characters — the server also enforces its full strength policy.</small>
+            <p-password [(ngModel)]="pw.next" name="next" inputId="npw" required minlength="8" maxlength="128" pattern="^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" autocomplete="new-password"></p-password>
+            <small class="hint">8+ characters with one uppercase &amp; one special character.</small>
           </div>
           <div class="field mb-0">
             <label for="cpw">Confirm new password</label>

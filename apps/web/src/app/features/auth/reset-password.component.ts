@@ -26,7 +26,8 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
           </div>
           <div class="field mb-0">
             <label for="np">New password</label>
-            <p-password [(ngModel)]="newPassword" name="newPassword" inputId="np" required minlength="8" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" placeholder="Min. 8 characters"></p-password>
+            <p-password [(ngModel)]="newPassword" name="newPassword" inputId="np" required minlength="8" maxlength="128" pattern="^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" placeholder="Min. 8 characters"></p-password>
+            <small class="hint">8+ characters with one uppercase &amp; one special character</small>
           </div>
           <div class="field mb-0">
             <label for="cp">Confirm password</label>
@@ -53,6 +54,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
       .auth-title { margin: 0.6rem 0 0.15rem; font-size: 1.6rem; }
       .auth-sub { margin: 0; color: #667085; }
       .field label { display: block; margin-bottom: 0.4rem; }
+      .hint { color: #98a2b3; font-size: 0.78rem; }
       .link { color: #b42318; font-weight: 600; font-size: 0.9rem; }
     `,
   ],
