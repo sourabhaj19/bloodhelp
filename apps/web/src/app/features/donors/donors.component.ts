@@ -1,12 +1,13 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewChild, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { SharedUiModule } from '../../shared/shared-ui.module';
+import { DonorMapComponent } from '../../shared/components/donor-map.component';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
 @Component({
   standalone: true,
-  imports: [SharedUiModule],
+  imports: [SharedUiModule, DonorMapComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1 class="page-title">Find donors</h1>
@@ -42,9 +43,10 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <label for="radius">Radius</label>
           <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
         </div>
-        <div class="col-12 md:col-5 flex align-items-end gap-2">
+        <div class="col-12 md:col-5 flex align-items-end gap-2 flex-wrap">
           <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
           <p-button label="Near me" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
+          <p-button label="View all on map" icon="pi pi-map" severity="secondary" [outlined]="true" (onClick)="showAllOnMap()" [disabled]="loading || mappableCount === 0" pTooltip="Fit all donor pins into the map view below"></p-button>
           <p-button label="Reset" severity="secondary" [text]="true" (onClick)="reset()"></p-button>
         </div>
       </div>
@@ -59,7 +61,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
     <p-card *ngIf="!loading && result" header="Donors" [subheader]="result.total + ' found'">
       <p-table [value]="result.items ?? []" styleClass="p-datatable-sm" responsiveLayout="scroll">
         <ng-template pTemplate="header">
-          <tr><th>Name</th><th>Blood</th><th>Location</th><th>Distance</th><th>Contact</th><th></th></tr>
+          <tr><th>Name</th><th>Blood</th><th>Location</th><th>Distance</th><th>Map</th><th></th></tr>
         </ng-template>
         <ng-template pTemplate="body" let-d>
           <tr>
@@ -68,8 +70,16 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             <td>{{ d.city }}<span *ngIf="d.area"> · {{ d.area }}</span><div *ngIf="d.pinCode" class="muted text-sm">{{ d.pinCode }}</div></td>
             <td><span *ngIf="d.approxDistanceKm">~{{ d.approxDistanceKm }} km</span><span *ngIf="!d.approxDistanceKm" class="muted">—</span></td>
             <td>
-              <span *ngIf="d.latitude" class="text-sm">{{ d.latitude | number: '1.4-4' }}, {{ d.longitude | number: '1.4-4' }}</span>
-              <span *ngIf="!d.latitude" class="muted text-sm">Hidden</span>
+              <p-button
+                *ngIf="d.latitude && d.longitude"
+                label="View on map"
+                icon="pi pi-map-marker"
+                size="small"
+                severity="secondary"
+                [outlined]="true"
+                (onClick)="focusOnMap(d)">
+              </p-button>
+              <span *ngIf="!d.latitude || !d.longitude" class="muted text-sm">—</span>
             </td>
             <td>
               <div class="flex gap-2">
@@ -92,6 +102,23 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         styleClass="mt-3">
       </p-paginator>
     </p-card>
+
+    <p-dialog [(visible)]="mapDialog" [modal]="true" [dismissableMask]="true" [draggable]="false"
+      [style]="{ width: 'min(900px, 96vw)' }" [header]="mapDialogTitle"
+      (onShow)="onMapDialogShow()" (onHide)="onMapDialogHide()">
+      <app-donor-map *ngIf="mapDialog"
+        [donors]="mapDialogDonors"
+        [centerLat]="filters.lat"
+        [centerLng]="filters.lng"
+        [focusId]="focusedDonorId"
+        [height]="420">
+      </app-donor-map>
+      <div class="flex align-items-center gap-2 mt-2 flex-wrap">
+        <span class="muted text-sm">📍 {{ mapDialogPlotted }} plotted · ◎ search center · OpenStreetMap</span>
+        <span class="flex-grow-1"></span>
+        <p-button *ngIf="mapDialogMode === 'single'" label="Show all pins" icon="pi pi-map" size="small" severity="secondary" [outlined]="true" (onClick)="dialogShowAll()"></p-button>
+      </div>
+    </p-dialog>
 
     <p-dialog [(visible)]="reportDialog" header="Report user" [modal]="true" [style]="{ width: 'min(460px, 94vw)' }">
       <p class="mt-0">Reporting <strong>{{ reportTarget?.displayName || reportTarget?.fullName }}</strong>. Reports are reviewed by admins; false reports may affect your account.</p>
@@ -139,6 +166,7 @@ export class DonorsComponent implements OnInit {
   error = '';
   result: any = null;
   myId = '';
+  focusedDonorId: string | null = null;
 
   reasons: any[] = [];
   reasonsLoaded = false;
@@ -182,12 +210,109 @@ export class DonorsComponent implements OnInit {
     return p;
   }
 
+  get mappableCount(): number {
+    const items = this.result?.items ?? [];
+    return items.filter((d: any) => this.hasCoords(d)).length;
+  }
+
+  private hasCoords(d: any): boolean {
+    const lat = Number(d?.latitude);
+    const lng = Number(d?.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  }
+
+  @ViewChild(DonorMapComponent) donorMap?: DonorMapComponent;
+
+  // ── Map dialog (modal) state ──────────────────────────────────────────
+  mapDialog = false;
+  mapDialogMode: 'single' | 'all' = 'all';
+  mapDialogDonor: any = null;
+  // Stored as a field (not a getter): a new array identity every CD cycle
+  // would retrigger the map's ngOnChanges endlessly.
+  mapDialogDonors: any[] = [];
+
+  get mapDialogTitle(): string {
+    if (this.mapDialogMode === 'single' && this.mapDialogDonor) {
+      const name = this.mapDialogDonor.displayName || this.mapDialogDonor.fullName || 'Donor';
+      return `${name} — on map`;
+    }
+    return `Donor map (${this.mapDialogPlotted} plotted)`;
+  }
+
+  get mapDialogPlotted(): number {
+    return (this.mapDialogDonors ?? []).filter((d: any) => this.hasCoords(d)).length;
+  }
+
+  /** Per-row "View on map" — open the modal focused on one donor. */
+  focusOnMap(d: any) {
+    if (!this.hasCoords(d)) return;
+    this.mapDialogMode = 'single';
+    this.mapDialogDonor = d;
+    this.mapDialogDonors = [d];
+    this.focusedDonorId = String(d.id);
+    this.mapDialog = true;
+    this.cdr.markForCheck();
+  }
+
+  /** "View all on map" — open the modal with every pin from current results. */
+  showAllOnMap() {
+    if (this.mappableCount === 0) {
+      this.errors.showWarn('No donor pins to show for the current results.');
+      return;
+    }
+    this.mapDialogMode = 'all';
+    this.mapDialogDonor = null;
+    this.mapDialogDonors = [...(this.result?.items ?? [])];
+    this.focusedDonorId = null;
+    this.mapDialog = true;
+    this.cdr.markForCheck();
+  }
+
+  /** Fired once the dialog is visible (has real size) — drive the map. */
+  onMapDialogShow() {
+    // The map child may still be fetching tile config — focusDonor/showAll
+    // queue a pending request and apply it once the map is ready.
+    setTimeout(() => {
+      if (this.mapDialogMode === 'single' && this.mapDialogDonor) {
+        this.donorMap?.focusDonor(String(this.mapDialogDonor.id));
+      } else {
+        this.donorMap?.showAll();
+      }
+    }, 120);
+  }
+
+  onMapDialogHide() {
+    this.mapDialogDonor = null;
+    this.mapDialogDonors = [];
+    this.focusedDonorId = null;
+  }
+
+  /** Inside the dialog: switch from single-pin to all-pins view. */
+  dialogShowAll() {
+    this.mapDialogMode = 'all';
+    this.mapDialogDonor = null;
+    this.mapDialogDonors = [...(this.result?.items ?? [])];
+    this.focusedDonorId = null;
+    this.cdr.markForCheck();
+    setTimeout(() => this.donorMap?.showAll(), 120);
+  }
+
   search() {
     this.loading = true;
     this.error = '';
     this.cdr.markForCheck();
     this.http.get<any>('/api/donors', { params: this.buildParams() }).subscribe({
-      next: (r) => { this.result = r.data ?? r; this.loading = false; this.cdr.markForCheck(); },
+      next: (r) => {
+        this.result = r.data ?? r;
+        // Drop pin focus if the focused donor is no longer in the results.
+        const ids = new Set((this.result?.items ?? []).map((d: any) => String(d?.id)));
+        if (this.focusedDonorId && !ids.has(String(this.focusedDonorId))) {
+          this.focusedDonorId = null;
+          this.donorMap?.clearFocus();
+        }
+        this.loading = false;
+        this.cdr.markForCheck();
+      },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
         this.errors.handleHttpError(e, 'Search failed');
@@ -199,6 +324,7 @@ export class DonorsComponent implements OnInit {
 
   reset() {
     this.filters = { bloodGroupId: '', city: '', area: '', pinCode: '', lat: null, lng: null, radiusKm: '', page: 1, pageSize: 20 };
+    this.focusedDonorId = null;
     this.search();
   }
 

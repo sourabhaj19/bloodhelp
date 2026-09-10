@@ -34,11 +34,6 @@ export default registerAs('app', () => ({
       pass: process.env.SMTP_PASSWORD || '',
     },
   },
-  map: {
-    tileProvider: process.env.MAP_TILE_PROVIDER || 'osm',
-    tileUrl: process.env.MAP_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: process.env.MAP_ATTRIBUTION || '&copy; OpenStreetMap contributors',
-  },
   geocoding: {
     provider: process.env.GEOCODING_PROVIDER || '',
     baseUrl: process.env.GEOCODING_BASE_URL || '',
