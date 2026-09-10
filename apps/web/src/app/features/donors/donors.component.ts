@@ -15,37 +15,33 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
     <p-card styleClass="mb-3">
       <div class="formgrid grid">
-        <div class="field col-12 md:col-3">
+        <div class="field col-12 md:col-4">
           <label for="bg">Blood group</label>
           <p-dropdown inputId="bg" [(ngModel)]="filters.bloodGroupId" [options]="bloodGroups" optionLabel="code" optionValue="id" placeholder="All groups" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
         </div>
-        <div class="field col-12 md:col-3">
+        <div class="field col-12 md:col-4">
+          <label for="country">Country</label>
+          <p-dropdown inputId="country" [(ngModel)]="filters.countryId" [options]="countries" optionLabel="name" optionValue="id" placeholder="Select country" [filter]="true" [showClear]="true" [appendTo]="'body'" (onChange)="onCountryChange()" styleClass="w-full"></p-dropdown>
+        </div>
+        <div class="field col-12 md:col-4">
+          <label for="state">State</label>
+          <p-dropdown inputId="state" [(ngModel)]="filters.stateId" [options]="states" optionLabel="name" optionValue="id" placeholder="Select state" [filter]="true" [showClear]="true" [appendTo]="'body'" [disabled]="!filters.countryId" (onChange)="onStateChange()" styleClass="w-full"></p-dropdown>
+        </div>
+        <div class="field col-12 md:col-4">
           <label for="city">City</label>
-          <input pInputText id="city" [(ngModel)]="filters.city" placeholder="City" class="w-full" />
+          <p-dropdown inputId="city" [(ngModel)]="filters.cityId" [options]="cities" optionLabel="name" optionValue="id" placeholder="Select city" [filter]="true" [showClear]="true" [appendTo]="'body'" [disabled]="!filters.stateId" styleClass="w-full"></p-dropdown>
         </div>
-        <div class="field col-6 md:col-3">
+        <div class="field col-12 md:col-4">
           <label for="area">Area</label>
-          <input pInputText id="area" [(ngModel)]="filters.area" placeholder="Area" class="w-full" />
+          <input pInputText id="area" [(ngModel)]="filters.area" placeholder="Area / locality" class="w-full" />
         </div>
-        <div class="field col-6 md:col-3">
-          <label for="pin">Pin code</label>
-          <input pInputText id="pin" [(ngModel)]="filters.pinCode" placeholder="Pin code" class="w-full" />
-        </div>
-        <div class="field col-6 md:col-2">
-          <label for="lat">Latitude</label>
-          <p-inputNumber inputId="lat" [(ngModel)]="filters.lat" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full"></p-inputNumber>
-        </div>
-        <div class="field col-6 md:col-2">
-          <label for="lng">Longitude</label>
-          <p-inputNumber inputId="lng" [(ngModel)]="filters.lng" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full"></p-inputNumber>
-        </div>
-        <div class="field col-12 md:col-3">
+        <div class="field col-12 md:col-4">
           <label for="radius">Radius</label>
           <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
         </div>
-        <div class="col-12 md:col-5 flex align-items-end gap-2 flex-wrap">
+        <div class="col-12 flex align-items-end gap-2 flex-wrap">
           <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
-          <p-button label="Near me" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
+          <p-button label="Near me" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()" pTooltip="Use GPS location for distance + radius"></p-button>
           <p-button label="View all on map" icon="pi pi-map" severity="secondary" [outlined]="true" (onClick)="showAllOnMap()" [disabled]="loading || mappableCount === 0" pTooltip="Fit all donor pins into the map view below"></p-button>
           <p-button label="Reset" severity="secondary" [text]="true" (onClick)="reset()"></p-button>
         </div>
@@ -155,6 +151,9 @@ export class DonorsComponent implements OnInit {
   private cdr = inject(ChangeDetectorRef);
 
   bloodGroups: any[] = [];
+  countries: any[] = [];
+  states: any[] = [];
+  cities: any[] = [];
   radiusOptions = [
     { label: '5 km', value: '5' },
     { label: '10 km', value: '10' },
@@ -174,18 +173,21 @@ export class DonorsComponent implements OnInit {
   reporting = false;
   reportTarget: any = null;
   report: any = { reasonId: '', description: '' };
-  filters: any = { bloodGroupId: '', city: '', area: '', pinCode: '', lat: null, lng: null, radiusKm: '', page: 1, pageSize: 20 };
+  filters: any = { bloodGroupId: '', countryId: '', stateId: '', cityId: '', area: '', radiusKm: '', lat: null, lng: null, page: 1, pageSize: 20 };
+  private defaultCountryId = '';
 
   ngOnInit() {
     this.http.get<any>('/api/master/blood-groups').subscribe({
       next: (r) => { this.bloodGroups = r.data ?? r; this.cdr.markForCheck(); },
       error: () => {},
     });
-    this.search();
+    this.loadCountries();
     this.http.get<any>('/api/users/me').subscribe({
       next: (r) => {
         const me = r.data ?? r;
         this.myId = me?.id || '';
+        // Keep profile location silently for map center / radius distance —
+        // no lat/lng inputs are shown in the filter UI anymore.
         if (me?.latitude && this.filters.lat == null) {
           this.filters.lat = me.latitude;
           this.filters.lng = me.longitude;
@@ -196,12 +198,61 @@ export class DonorsComponent implements OnInit {
     });
   }
 
+  private pickDefaultCountry(list: any[]): string {
+    if (!list?.length) return '';
+    const india = list.find((c) => c.isoCode2 === 'IN' || String(c.name ?? '').toLowerCase() === 'india');
+    if (india) return india.id;
+    if (list.length === 1) return list[0].id;
+    return '';
+  }
+
+  loadCountries() {
+    this.http.get<any>('/api/master/countries').subscribe({
+      next: (r) => {
+        this.countries = r.data ?? r ?? [];
+        this.defaultCountryId = this.pickDefaultCountry(this.countries);
+        if (this.defaultCountryId && !this.filters.countryId) {
+          this.filters.countryId = this.defaultCountryId;
+          this.onCountryChange();
+        }
+        this.search();
+        this.cdr.markForCheck();
+      },
+      error: () => this.search(),
+    });
+  }
+
+  onCountryChange() {
+    this.states = [];
+    this.cities = [];
+    this.filters.stateId = '';
+    this.filters.cityId = '';
+    if (!this.filters.countryId) { this.cdr.markForCheck(); return; }
+    this.http.get<any>(`/api/master/countries/${this.filters.countryId}/states`).subscribe({
+      next: (r) => { this.states = r.data ?? r ?? []; this.cdr.markForCheck(); },
+      error: () => {},
+    });
+  }
+
+  onStateChange() {
+    this.cities = [];
+    this.filters.cityId = '';
+    if (!this.filters.stateId) { this.cdr.markForCheck(); return; }
+    this.http.get<any>(`/api/master/states/${this.filters.stateId}/cities`).subscribe({
+      next: (r) => { this.cities = r.data ?? r ?? []; this.cdr.markForCheck(); },
+      error: () => {},
+    });
+  }
+
   buildParams() {
     let p = new HttpParams();
     if (this.filters.bloodGroupId) p = p.set('bloodGroupId', this.filters.bloodGroupId);
-    if (this.filters.city) p = p.set('city', this.filters.city);
+    if (this.filters.countryId) p = p.set('countryId', this.filters.countryId);
+    if (this.filters.stateId) p = p.set('stateId', this.filters.stateId);
+    if (this.filters.cityId) p = p.set('cityId', this.filters.cityId);
     if (this.filters.area) p = p.set('area', this.filters.area);
-    if (this.filters.pinCode) p = p.set('pinCode', this.filters.pinCode);
+    // Hidden geo center (Near me / profile) — only sent when present so
+    // radius + distance work; no lat/lng inputs in the filter UI.
     if (this.filters.lat != null && this.filters.lat !== '') p = p.set('lat', String(this.filters.lat));
     if (this.filters.lng != null && this.filters.lng !== '') p = p.set('lng', String(this.filters.lng));
     if (this.filters.radiusKm) p = p.set('radiusKm', this.filters.radiusKm);
@@ -323,7 +374,10 @@ export class DonorsComponent implements OnInit {
   }
 
   reset() {
-    this.filters = { bloodGroupId: '', city: '', area: '', pinCode: '', lat: null, lng: null, radiusKm: '', page: 1, pageSize: 20 };
+    this.filters = { bloodGroupId: '', countryId: this.defaultCountryId, stateId: '', cityId: '', area: '', radiusKm: '', lat: this.filters.lat ?? null, lng: this.filters.lng ?? null, page: 1, pageSize: 20 };
+    this.states = [];
+    this.cities = [];
+    if (this.filters.countryId) this.onCountryChange();
     this.focusedDonorId = null;
     this.search();
   }

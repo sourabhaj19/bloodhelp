@@ -19,15 +19,26 @@ export class DonorsService {
     return `${visible}${masked} ${last ? last.charAt(0) + '.' : ''}`;
   }
 
+  private maskMobile(mobile?: string, dialCode?: string): string {
+    if (!mobile) return '';
+    const digits = String(mobile).replace(/\D/g, '');
+    if (!digits.length) return '';
+    if (digits.length <= 4) return '*'.repeat(digits.length);
+    const visibleStart = 2;
+    const visibleEnd = 2;
+    const maskedLen = digits.length - visibleStart - visibleEnd;
+    const maskedDigits = digits.slice(0, visibleStart) + '*'.repeat(maskedLen) + digits.slice(digits.length - visibleEnd);
+    const cleanDial = dialCode ? String(dialCode).trim() : '';
+    return cleanDial ? `${cleanDial} ${maskedDigits}` : maskedDigits;
+  }
+
   async search(dto: DonorSearchDto, requester?: JwtPayload) {
-    // Validate lat/lng coupling per §4.2
+    // lat/lng must come together; radius without a center is ignored
+    // (location-dropdown search works without coordinates).
     const hasLat = dto.lat !== undefined && dto.lat !== null;
     const hasLng = dto.lng !== undefined && dto.lng !== null;
     if ((hasLat && !hasLng) || (!hasLat && hasLng)) {
       throw new BadRequestException({ code: 'INVALID_LOCATION', message: 'lat and lng must be provided together' });
-    }
-    if (dto.radiusKm && !hasLat) {
-      throw new BadRequestException({ code: 'INVALID_RADIUS', message: 'radiusKm requires lat and lng' });
     }
 
     const page = Math.max(1, dto.page ?? 1);
@@ -45,9 +56,13 @@ export class DonorsService {
       where.active = true;
     }
     if (dto.bloodGroupId) where.bloodGroupId = dto.bloodGroupId;
-    if (dto.country) where.country = { name: dto.country };
-    if (dto.state) where.state = { name: dto.state };
-    if (dto.city) where.city = { name: dto.city };
+    // Prefer IDs (new dropdown UI); fall back to names for backwards compat.
+    if (dto.countryId) where.countryId = dto.countryId;
+    else if (dto.country) where.country = { name: dto.country };
+    if (dto.stateId) where.stateId = dto.stateId;
+    else if (dto.state) where.state = { name: dto.state };
+    if (dto.cityId) where.cityId = dto.cityId;
+    else if (dto.city) where.city = { name: dto.city };
     if (dto.area) where.area = { contains: dto.area };
     if (dto.pinCode) where.pinCode = dto.pinCode;
     if (dto.search) {
@@ -75,7 +90,7 @@ export class DonorsService {
       this.prisma.user.count({ where }),
       this.prisma.user.findMany({
         where,
-        include: { bloodGroup: true, country: true, state: true, city: true },
+        include: { bloodGroup: true, country: true, state: true, city: true, countryCode: true },
         orderBy,
         skip: offset,
         take: pageSize,
@@ -116,6 +131,27 @@ export class DonorsService {
       whereClauses.push('u.blood_group_id = ?');
       whereParams.push(baseWhere.bloodGroupId);
     }
+    if (baseWhere.countryId) {
+      whereClauses.push('u.country_id = ?');
+      whereParams.push(baseWhere.countryId);
+    } else if (dto.country) {
+      whereClauses.push('c.name = ?');
+      whereParams.push(dto.country);
+    }
+    if (baseWhere.stateId) {
+      whereClauses.push('u.state_id = ?');
+      whereParams.push(baseWhere.stateId);
+    } else if (dto.state) {
+      whereClauses.push('s.name = ?');
+      whereParams.push(dto.state);
+    }
+    if (baseWhere.cityId) {
+      whereClauses.push('u.city_id = ?');
+      whereParams.push(baseWhere.cityId);
+    } else if (dto.city) {
+      whereClauses.push('ci.name = ?');
+      whereParams.push(dto.city);
+    }
     if (dto.pinCode) {
       whereClauses.push('u.pin_code = ?');
       whereParams.push(dto.pinCode);
@@ -141,20 +177,26 @@ export class DonorsService {
     // Subquery computes distance_km per row; outer query filters + counts.
     // (Avoids HAVING-without-GROUP-BY quirks and keeps param order explicit.)
     // MySQL 8 supports window function COUNT(*) OVER().
+    // NOTE: COUNT(*) returns BIGINT which Prisma surfaces as BigInt and then
+    // fails to serialize ("Do not know how to serialize a BigInt"), killing
+    // the geo path and silently falling back to no-distance results. CAST to
+    // CHAR so it arrives as a string; Number() below parses it back.
     const dataSql = `
-      SELECT t.*, COUNT(*) OVER() as total_count
+      SELECT t.*, CAST(COUNT(*) OVER() AS CHAR) as total_count
       FROM (
         SELECT
           u.id, u.first_name, u.last_name, u.area, u.pin_code, u.latitude, u.longitude,
-          u.blood_group_id, u.country_id, u.state_id, u.city_id, u.active, u.created_at,
+          u.mobile, u.blood_group_id, u.country_id, u.state_id, u.city_id, u.active, u.created_at,
           bg.code as blood_group_code, bg.label as blood_group_label,
           c.name as country_name, s.name as state_name, ci.name as city_name,
+          cc.\`dialCode\` as dial_code,
           ${haversineExpr} as distance_km
         FROM users u
         LEFT JOIN blood_groups bg ON bg.id = u.blood_group_id
         LEFT JOIN countries c ON c.id = u.country_id
         LEFT JOIN states s ON s.id = u.state_id
         LEFT JOIN cities ci ON ci.id = u.city_id
+        LEFT JOIN country_codes cc ON cc.id = u.country_code_id
         WHERE ${whereSql}
       ) as t
       WHERE ${radiusFilter}
@@ -187,6 +229,9 @@ export class DonorsService {
             pinCode: r.pin_code,
             latitude: r.latitude,
             longitude: r.longitude,
+            mobile: r.mobile,
+            dialCode: r.dial_code,
+            countryCode: r.dial_code ? { dialCode: r.dial_code } : null,
             bloodGroupId: r.blood_group_id,
             bloodGroup: r.blood_group_code ? { code: r.blood_group_code, label: r.blood_group_label } : null,
             country: r.country_name ? { name: r.country_name } : null,
@@ -207,7 +252,7 @@ export class DonorsService {
         this.prisma.user.count({ where: baseWhere }),
         this.prisma.user.findMany({
           where: baseWhere,
-          include: { bloodGroup: true, country: true, state: true, city: true },
+          include: { bloodGroup: true, country: true, state: true, city: true, countryCode: true },
           skip: offset,
           take: pageSize,
           orderBy: { createdAt: 'desc' },
@@ -221,7 +266,7 @@ export class DonorsService {
   async findOne(id: string, requester?: JwtPayload) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { bloodGroup: true, country: true, state: true, city: true },
+      include: { bloodGroup: true, country: true, state: true, city: true, countryCode: true },
     });
     if (!user || user.deletedAt) throw new BadRequestException({ code: 'DONOR_NOT_FOUND', message: 'Donor not found' });
     if (!user.active) throw new BadRequestException({ code: 'DONOR_INACTIVE', message: 'Donor is inactive' });
@@ -252,6 +297,7 @@ export class DonorsService {
   }
 
   private mapDonor(u: any, isAuthenticated: boolean, distanceKm: number | null) {
+    const dial = u.countryCode?.dialCode ?? (u as any).dialCode ?? null;
     const base: any = {
       id: u.id,
       bloodGroup: u.bloodGroup?.code ?? u.bloodGroup ?? null,
@@ -263,7 +309,7 @@ export class DonorsService {
       active: u.active,
       createdAt: (u as any).createdAt,
     };
-    if (distanceKm !== null) base.approxDistanceKm = Math.round(distanceKm * 10) / 10;
+    if (distanceKm !== null && distanceKm !== undefined) base.approxDistanceKm = Math.round(distanceKm * 10) / 10;
     if (isAuthenticated) {
       base.displayName = `${u.firstName} ${u.lastName}`;
       base.fullName = `${u.firstName} ${u.lastName}`;
@@ -272,9 +318,13 @@ export class DonorsService {
       base.pinCode = u.pinCode;
       base.latitude = u.latitude != null ? Number(u.latitude) : undefined;
       base.longitude = u.longitude != null ? Number(u.longitude) : undefined;
+      if (u.mobile) {
+        base.mobile = dial ? `${dial} ${u.mobile}` : u.mobile;
+        base.maskedMobile = this.maskMobile(u.mobile, dial);
+      }
     } else {
       base.displayName = this.maskName(u.firstName ?? '', u.lastName ?? '');
-      if (distanceKm !== null) base.approxDistanceKm = Math.round(distanceKm * 10) / 10;
+      if (u.mobile) base.maskedMobile = this.maskMobile(u.mobile, dial);
     }
     return base;
   }
