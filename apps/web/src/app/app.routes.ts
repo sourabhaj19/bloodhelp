@@ -105,6 +105,11 @@ export const routes: Routes = [
           import('./features/profile/profile.component').then((m) => m.ProfileComponent),
       },
       {
+        path: 'change-password',
+        loadComponent: () =>
+          import('./features/profile/change-password.component').then((m) => m.ChangePasswordComponent),
+      },
+      {
         path: 'notifications',
         loadComponent: () =>
           import('./features/notifications/notifications.component').then(

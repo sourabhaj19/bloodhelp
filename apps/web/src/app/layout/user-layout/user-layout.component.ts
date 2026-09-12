@@ -21,6 +21,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/notifications" routerLinkActive="active">Notifications</a>
         <a routerLink="/reports" routerLinkActive="active">My reports</a>
         <a routerLink="/profile" routerLinkActive="active">Profile</a>
+        <a routerLink="/change-password" routerLinkActive="active">Password</a>
       </nav>
       <div class="topbar-actions">
         <p-button icon="pi pi-bell" severity="secondary" [outlined]="true" [rounded]="true" routerLink="/notifications" pTooltip="Notifications" tooltipPosition="bottom" styleClass="hide-sm"></p-button>
@@ -39,6 +40,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/notifications" routerLinkActive="active" (click)="sidebar = false" class="side-link">Notifications</a>
         <a routerLink="/reports" routerLinkActive="active" (click)="sidebar = false" class="side-link">My reports</a>
         <a routerLink="/profile" routerLinkActive="active" (click)="sidebar = false" class="side-link">Profile</a>
+        <a routerLink="/change-password" routerLinkActive="active" (click)="sidebar = false" class="side-link">Change password</a>
         <p-divider></p-divider>
         <p-button label="Logout" icon="pi pi-sign-out" severity="secondary" [outlined]="true" styleClass="w-full" (onClick)="logout()"></p-button>
       </div>

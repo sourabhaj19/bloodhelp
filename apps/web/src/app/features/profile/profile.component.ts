@@ -21,55 +21,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         <p-skeleton height="2.5rem" styleClass="mb-2" *ngFor="let i of [1, 2, 3, 4]"></p-skeleton>
       </p-card>
 
-      <p-card *ngIf="!loading && profile" header="Personal details">
-        <form (ngSubmit)="save()" #f="ngForm" class="formgrid grid">
-          <div class="field col-12 md:col-6">
-            <label for="fn">First name</label>
-            <input pInputText id="fn" [(ngModel)]="profile.firstName" name="firstName" required class="w-full" />
-          </div>
-          <div class="field col-12 md:col-6">
-            <label for="ln">Last name</label>
-            <input pInputText id="ln" [(ngModel)]="profile.lastName" name="lastName" required class="w-full" />
-          </div>
-          <div class="field col-12 md:col-6">
-            <label for="em">Email</label>
-            <input pInputText id="em" [(ngModel)]="profile.email" name="email" type="email" required email class="w-full" />
-          </div>
-          <div class="field col-12 md:col-6">
-            <label for="mo">Mobile</label>
-            <input pInputText id="mo" [(ngModel)]="profile.mobile" name="mobile" required class="w-full" />
-          </div>
-          <div class="field col-12 md:col-6">
-            <label for="area">Area</label>
-            <input pInputText id="area" [(ngModel)]="profile.area" name="area" class="w-full" />
-          </div>
-          <div class="field col-12 md:col-6">
-            <label for="pin">Pin code</label>
-            <input pInputText id="pin" [(ngModel)]="profile.pinCode" name="pinCode" class="w-full" />
-          </div>
-          <div class="field col-6">
-            <label for="lat">Latitude</label>
-            <p-inputNumber inputId="lat" [(ngModel)]="profile.latitude" name="latitude" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full"></p-inputNumber>
-          </div>
-          <div class="field col-6">
-            <label for="lng">Longitude</label>
-            <p-inputNumber inputId="lng" [(ngModel)]="profile.longitude" name="longitude" [maxFractionDigits]="6" styleClass="w-full" inputStyleClass="w-full"></p-inputNumber>
-          </div>
-          <div class="col-12 flex flex-wrap gap-2">
-            <p-button type="button" label="Use my location" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
-            <p-button type="submit" label="Save changes" icon="pi pi-check" [loading]="saving" [disabled]="f.invalid || saving"></p-button>
-          </div>
-        </form>
-      </p-card>
-
-      <p-card *ngIf="!loading && profile" header="Account status" subheader="Inactive profiles are hidden from search" styleClass="mt-3">
-        <div class="flex align-items-center justify-content-between">
-          <span class="font-bold">Active donor</span>
-          <p-inputSwitch [(ngModel)]="profile.active" (onChange)="toggleActive()"></p-inputSwitch>
-        </div>
-      </p-card>
-
-      <p-card *ngIf="!loading && profile" header="Verification" subheader="Verified contact details keep the community trustworthy" styleClass="mt-3">
+      <p-card *ngIf="!loading && profile" header="Verification" subheader="Verified contact details keep the community trustworthy" styleClass="mb-3">
         <div class="flex flex-column gap-3">
           <div class="flex align-items-center justify-content-between gap-2 flex-wrap">
             <div>
@@ -95,6 +47,55 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         </div>
       </p-card>
 
+      <p-card *ngIf="!loading && profile" header="Personal details">
+        <div class="flex align-items-center justify-content-between mb-3 px-3 py-2 border-round" style="background: #f9fafb">
+          <span class="font-bold">Active donor <span class="muted text-sm font-normal">— visible in search</span></span>
+          <p-inputSwitch [(ngModel)]="profile.active" (onChange)="toggleActive()"></p-inputSwitch>
+        </div>
+        <form (ngSubmit)="save()" #f="ngForm" class="formgrid grid">
+          <div class="field col-12 md:col-6">
+            <label for="fn">First name</label>
+            <input pInputText id="fn" [(ngModel)]="profile.firstName" name="firstName" required class="w-full" />
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="ln">Last name</label>
+            <input pInputText id="ln" [(ngModel)]="profile.lastName" name="lastName" required class="w-full" />
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="em">Email</label>
+            <input pInputText id="em" [(ngModel)]="profile.email" name="email" type="email" required email class="w-full" />
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="mo">Mobile</label>
+            <input pInputText id="mo" [(ngModel)]="profile.mobile" name="mobile" required class="w-full" />
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="country">Country</label>
+            <p-dropdown inputId="country" [(ngModel)]="profile.countryId" name="countryId" [options]="countries" optionLabel="name" optionValue="id" placeholder="Select country" [filter]="true" [appendTo]="'body'" (onChange)="onCountryChange()" styleClass="w-full" required></p-dropdown>
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="state">State</label>
+            <p-dropdown inputId="state" [(ngModel)]="profile.stateId" name="stateId" [options]="states" optionLabel="name" optionValue="id" placeholder="Select state" [filter]="true" [appendTo]="'body'" [disabled]="!profile.countryId" (onChange)="onStateChange()" styleClass="w-full" required></p-dropdown>
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="city">City</label>
+            <p-dropdown inputId="city" [(ngModel)]="profile.cityId" name="cityId" [options]="cities" optionLabel="name" optionValue="id" placeholder="Select city" [filter]="true" [appendTo]="'body'" [disabled]="!profile.stateId" styleClass="w-full" required></p-dropdown>
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="area">Area</label>
+            <input pInputText id="area" [(ngModel)]="profile.area" name="area" class="w-full" />
+          </div>
+          <div class="field col-12 md:col-6">
+            <label for="pin">Pin code</label>
+            <input pInputText id="pin" [(ngModel)]="profile.pinCode" name="pinCode" class="w-full" />
+          </div>
+          <div class="col-12 flex flex-wrap gap-2">
+            <p-button type="button" label="Use my location" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
+            <p-button type="submit" label="Save changes" icon="pi pi-check" [loading]="saving" [disabled]="f.invalid || saving"></p-button>
+          </div>
+        </form>
+      </p-card>
+
       <p-dialog [(visible)]="otpDialog" header="Enter verification code" [modal]="true" [style]="{ width: 'min(400px, 94vw)' }">
         <p class="mt-0">We sent a 6-digit code to <strong>{{ profile?.mobile }}</strong>. It expires in 10 minutes.</p>
         <p-message *ngIf="devOtp" severity="info" [text]="'Dev mode — your code is ' + devOtp" styleClass="w-full mb-3"></p-message>
@@ -108,29 +109,6 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <p-button label="Verify" icon="pi pi-check" (onClick)="confirmOtp()" [loading]="otpVerifying" [disabled]="otp.trim().length !== 6"></p-button>
         </div>
       </p-dialog>
-
-      <p-card *ngIf="!loading && profile" header="Security" subheader="Changing your password logs out all other devices" styleClass="mt-3">
-        <p-message *ngIf="pwError" severity="error" [text]="pwError" styleClass="w-full mb-3"></p-message>
-        <p-message *ngIf="pwMismatch" severity="warn" text="New passwords do not match." styleClass="w-full mb-3"></p-message>
-        <form (ngSubmit)="changePassword()" #pwForm="ngForm" class="flex flex-column gap-3">
-          <div class="field mb-0">
-            <label for="cur">Current password</label>
-            <p-password [(ngModel)]="pw.current" name="current" inputId="cur" required [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" autocomplete="current-password"></p-password>
-          </div>
-          <div class="field mb-0">
-            <label for="npw">New password</label>
-            <p-password [(ngModel)]="pw.next" name="next" inputId="npw" required minlength="8" maxlength="128" pattern="^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" autocomplete="new-password"></p-password>
-            <small class="hint">8+ characters with one uppercase &amp; one special character.</small>
-          </div>
-          <div class="field mb-0">
-            <label for="cpw">Confirm new password</label>
-            <p-password [(ngModel)]="pw.confirm" name="confirm" inputId="cpw" required [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" autocomplete="new-password"></p-password>
-          </div>
-          <div>
-            <p-button type="submit" label="Change password" icon="pi pi-key" [loading]="pwSaving" [disabled]="pwForm.invalid || pwSaving"></p-button>
-          </div>
-        </form>
-      </p-card>
     </div>
   `,
   styles: [
@@ -149,11 +127,6 @@ export class ProfileComponent implements OnInit {
   private errors = inject(ErrorHandlerService);
   private cdr = inject(ChangeDetectorRef);
 
-  pw = { current: '', next: '', confirm: '' };
-  pwSaving = false;
-  pwError = '';
-  pwMismatch = false;
-
   emailSending = false;
   otpDialog = false;
   otp = '';
@@ -167,13 +140,22 @@ export class ProfileComponent implements OnInit {
   message = '';
   error = '';
 
+  countries: any[] = [];
+  states: any[] = [];
+  cities: any[] = [];
+
   ngOnInit() {
     this.loadProfile();
   }
 
   loadProfile() {
     this.http.get<any>('/api/users/me').subscribe({
-      next: (r) => { this.profile = r.data ?? r; this.loading = false; this.cdr.markForCheck(); },
+      next: (r) => {
+        this.profile = r.data ?? r;
+        this.loading = false;
+        this.loadLocationMasters();
+        this.cdr.markForCheck();
+      },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
         this.errors.handleHttpError(e, 'Failed to load profile');
@@ -181,6 +163,61 @@ export class ProfileComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  /** Same cascading behaviour as registration: country → states → cities. */
+  loadLocationMasters() {
+    this.http.get<any>('/api/master/countries').subscribe({
+      next: (r) => {
+        this.countries = r.data ?? r ?? [];
+        // Preserve profile's existing selection, just load its dependents.
+        if (this.profile?.countryId) this.loadStates(true);
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
+  private loadStates(preserveSelection = false) {
+    if (!preserveSelection) {
+      this.states = [];
+      this.cities = [];
+    }
+    if (!this.profile?.countryId) {
+      if (!preserveSelection) this.cdr.markForCheck();
+      return;
+    }
+    this.http.get<any>(`/api/master/countries/${this.profile.countryId}/states`).subscribe({
+      next: (r) => {
+        this.states = r.data ?? r ?? [];
+        if (this.profile?.stateId) this.loadCities(true);
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
+  private loadCities(preserveSelection = false) {
+    if (!preserveSelection) this.cities = [];
+    if (!this.profile?.stateId) {
+      if (!preserveSelection) this.cdr.markForCheck();
+      return;
+    }
+    this.http.get<any>(`/api/master/states/${this.profile.stateId}/cities`).subscribe({
+      next: (r) => { this.cities = r.data ?? r ?? []; this.cdr.markForCheck(); },
+      error: () => {},
+    });
+  }
+
+  onCountryChange() {
+    this.profile.stateId = '';
+    this.profile.cityId = '';
+    this.loadStates();
+  }
+
+  onStateChange() {
+    this.profile.cityId = '';
+    this.loadCities();
   }
 
   async resendEmail() {
@@ -255,6 +292,9 @@ export class ProfileComponent implements OnInit {
       lastName: this.profile.lastName,
       email: this.profile.email,
       mobile: this.profile.mobile,
+      countryId: this.profile.countryId,
+      stateId: this.profile.stateId,
+      cityId: this.profile.cityId,
       area: this.profile.area,
       pinCode: this.profile.pinCode,
       latitude: Number(this.profile.latitude),
@@ -263,6 +303,8 @@ export class ProfileComponent implements OnInit {
     this.http.patch<any>('/api/users/me', payload).subscribe({
       next: (r) => {
         this.profile = r.data ?? r;
+        // Refresh dependents in case IDs changed server-side.
+        this.loadLocationMasters();
         this.message = 'Profile saved.';
         this.errors.showSuccess('Profile saved.');
         this.saving = false;
@@ -290,23 +332,5 @@ export class ProfileComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
-  }
-
-  async changePassword() {
-    this.pwError = '';
-    this.pwMismatch = this.pw.next !== this.pw.confirm;
-    if (this.pwMismatch || !this.pw.current || !this.pw.next) return;
-    this.pwSaving = true;
-    try {
-      await this.auth.changePassword(this.pw.current, this.pw.next, this.pw.confirm);
-      this.pw = { current: '', next: '', confirm: '' };
-      this.errors.showSuccess('Password changed. All other devices were logged out.');
-    } catch (e: any) {
-      this.pwError = this.errors.getUserMessage(e);
-      this.errors.handleHttpError(e, 'Password change failed');
-    } finally {
-      this.pwSaving = false;
-      this.cdr.markForCheck();
-    }
   }
 }
