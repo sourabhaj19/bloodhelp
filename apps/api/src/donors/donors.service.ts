@@ -46,9 +46,12 @@ export class DonorsService {
     const offset = (page - 1) * pageSize;
 
     const isAuthenticated = !!requester;
+    const excludeUserId = requester?.sub;
 
     // Build where clause for non-spatial filters (MySQL: mode insensitive not supported, LIKE is case-insensitive via collation)
     const where: any = { deletedAt: null };
+    // Never show the logged-in user in their own Find-donor results
+    if (excludeUserId) where.id = { not: excludeUserId };
     if (dto.active !== undefined) {
       const activeVal = String(dto.active).toLowerCase();
       if (activeVal === 'true' || activeVal === 'false') where.active = activeVal === 'true';
@@ -75,7 +78,7 @@ export class DonorsService {
 
     // If geospatial search requested, use Haversine formula for MySQL
     if (hasLat && hasLng) {
-      return this.searchWithMySQL(dto, page, pageSize, offset, isAuthenticated, where);
+      return this.searchWithMySQL(dto, page, pageSize, offset, isAuthenticated, where, excludeUserId);
     }
 
     // Non-spatial fallback: plain Prisma
@@ -108,6 +111,7 @@ export class DonorsService {
     offset: number,
     isAuthenticated: boolean,
     baseWhere: any,
+    excludeUserId?: string,
   ) {
     const lat = dto.lat!;
     const lng = dto.lng!;
@@ -122,6 +126,12 @@ export class DonorsService {
     //   then radius filter, then LIMIT/OFFSET.
     const whereClauses: string[] = ['u.deleted_at IS NULL'];
     const whereParams: any[] = [];
+
+    // Never show the logged-in user in their own Find-donor results
+    if (excludeUserId) {
+      whereClauses.push('u.id != ?');
+      whereParams.push(excludeUserId);
+    }
 
     if (baseWhere.active !== undefined) {
       whereClauses.push('u.active = ?');
