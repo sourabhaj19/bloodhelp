@@ -32,11 +32,21 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
       <div class="grid stagger">
         <div class="col-12 md:col-6">
           <p-card header="Eligibility basics">
+            <h4 class="mt-0 mb-2">Basic requirements</h4>
             <div class="flex flex-column gap-2">
-              <div class="flex align-items-center gap-2"><i class="pi pi-check-circle ok"></i> Age 18–65, weight 50 kg or more</div>
-              <div class="flex align-items-center gap-2"><i class="pi pi-check-circle ok"></i> Feeling healthy on donation day</div>
-              <div class="flex align-items-center gap-2"><i class="pi pi-check-circle ok"></i> 3 months since last donation</div>
-              <div class="flex align-items-center gap-2"><i class="pi pi-times-circle no"></i> Skip if you have fever, infection, or recent surgery</div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-check-circle ok mt-1"></i> <span><strong>Age:</strong> 18 to 65 years old</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-check-circle ok mt-1"></i> <span><strong>Weight:</strong> minimum 45 kg</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-check-circle ok mt-1"></i> <span><strong>General health:</strong> feel well, physically fit, with no active infections, colds, or fevers on donation day</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-check-circle ok mt-1"></i> <span><strong>Hemoglobin:</strong> at least 12.5 g/dL</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-check-circle ok mt-1"></i> <span><strong>Vital signs:</strong> blood pressure, pulse rate, and body temperature within normal ranges</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-check-circle ok mt-1"></i> <span>3 months since last donation</span></div>
+            </div>
+            <h4 class="mb-2 mt-3">Important restrictions — please skip / defer if</h4>
+            <div class="flex flex-column gap-2">
+              <div class="flex align-items-start gap-2"><i class="pi pi-times-circle no mt-1"></i> <span>You have fever, infection, cold, or recent surgery</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-times-circle no mt-1"></i> <span><strong>Medications:</strong> on antibiotics or active treatment for an acute illness</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-times-circle no mt-1"></i> <span><strong>Tattoos / piercings:</strong> wait 3–12 months after a new tattoo or piercing (per local guidelines)</span></div>
+              <div class="flex align-items-start gap-2"><i class="pi pi-times-circle no mt-1"></i> <span><strong>Pregnancy:</strong> cannot donate while pregnant or breastfeeding</span></div>
             </div>
           </p-card>
         </div>
