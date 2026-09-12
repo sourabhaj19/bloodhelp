@@ -49,7 +49,8 @@ export class DonorsService {
     const excludeUserId = requester?.sub;
 
     // Build where clause for non-spatial filters (MySQL: mode insensitive not supported, LIKE is case-insensitive via collation)
-    const where: any = { deletedAt: null };
+    // Admins manage the platform — never show them as donors in any search.
+    const where: any = { deletedAt: null, role: 'USER' };
     // Never show the logged-in user in their own Find-donor results
     if (excludeUserId) where.id = { not: excludeUserId };
     if (dto.active !== undefined) {
@@ -124,7 +125,7 @@ export class DonorsService {
     // exact textual order the placeholders appear in the SQL below:
     //   1-3: haversine lat/lng/lat (SELECT)  4+: WHERE filters
     //   then radius filter, then LIMIT/OFFSET.
-    const whereClauses: string[] = ['u.deleted_at IS NULL'];
+    const whereClauses: string[] = ['u.deleted_at IS NULL', "u.role = 'USER'"];
     const whereParams: any[] = [];
 
     // Never show the logged-in user in their own Find-donor results

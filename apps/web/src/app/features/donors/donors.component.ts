@@ -57,14 +57,15 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
     <p-card *ngIf="!loading && result" header="Donors" [subheader]="result.total + ' found'">
       <p-table [value]="result.items ?? []" styleClass="p-datatable-sm" responsiveLayout="scroll">
         <ng-template pTemplate="header">
-          <tr><th>Name</th><th>Blood</th><th>Location</th><th>Distance</th><th>Map</th><th></th></tr>
+          <tr><th>Name</th><th>Blood</th><th>Mobile</th><th>Address</th><th>Distance</th><th>Map</th><th></th></tr>
         </ng-template>
         <ng-template pTemplate="body" let-d>
           <tr>
-            <td><p-avatar [label]="(d.displayName || d.fullName || '?').charAt(0)" shape="circle" styleClass="mr-2"></p-avatar><strong>{{ d.displayName || d.fullName }}</strong></td>
+            <td><strong>{{ d.displayName || d.fullName }}</strong></td>
             <td><p-tag [value]="d.bloodGroup" severity="danger"></p-tag></td>
-            <td>{{ d.city }}<span *ngIf="d.area"> · {{ d.area }}</span><div *ngIf="d.pinCode" class="muted text-sm">{{ d.pinCode }}</div></td>
-            <td><span *ngIf="d.approxDistanceKm">~{{ d.approxDistanceKm }} km</span><span *ngIf="!d.approxDistanceKm" class="muted">—</span></td>
+            <td><span *ngIf="d.mobile || d.maskedMobile"><i class="pi pi-phone mr-1 muted"></i>{{ d.mobile || d.maskedMobile }}</span><span *ngIf="!d.mobile && !d.maskedMobile" class="muted">—</span></td>
+            <td><div>{{ d.state }}<span *ngIf="d.city"> · {{ d.city }}</span></div><div *ngIf="d.area" class="muted text-sm">{{ d.area }}</div><div *ngIf="d.pinCode" class="muted text-sm">{{ d.pinCode }}</div></td>
+            <td><span *ngIf="d.approxDistanceKm != null">~{{ d.approxDistanceKm }} km</span><span *ngIf="d.approxDistanceKm == null" class="muted">—</span></td>
             <td>
               <p-button
                 *ngIf="d.latitude && d.longitude"
@@ -86,7 +87,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           </tr>
         </ng-template>
         <ng-template pTemplate="emptymessage">
-          <tr><td colspan="6" class="text-center muted">No donors match. Try a wider radius.</td></tr>
+          <tr><td colspan="7" class="text-center muted">No donors match. Try a wider radius.</td></tr>
         </ng-template>
       </p-table>
       <p-paginator
@@ -181,20 +182,22 @@ export class DonorsComponent implements OnInit {
       next: (r) => { this.bloodGroups = r.data ?? r; this.cdr.markForCheck(); },
       error: () => {},
     });
-    this.loadCountries();
+    // Load profile first so the initial search already carries lat/lng —
+    // that way distance is calculated on first load without needing "Near me".
     this.http.get<any>('/api/users/me').subscribe({
       next: (r) => {
         const me = r.data ?? r;
         this.myId = me?.id || '';
         // Keep profile location silently for map center / radius distance —
         // no lat/lng inputs are shown in the filter UI anymore.
-        if (me?.latitude && this.filters.lat == null) {
+        if (me?.latitude != null && me?.longitude != null && this.filters.lat == null) {
           this.filters.lat = me.latitude;
           this.filters.lng = me.longitude;
-          this.cdr.markForCheck();
         }
+        this.loadCountries();
+        this.cdr.markForCheck();
       },
-      error: () => {},
+      error: () => this.loadCountries(),
     });
   }
 
