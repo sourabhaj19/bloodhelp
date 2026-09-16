@@ -5,13 +5,11 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @ApiTags('geocoding')
 @Controller('geocoding')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth('access-token')
 export class GeocodingController {
   constructor(private readonly geocoding: GeocodingService) {}
 
   @Get('forward')
-  @ApiOperation({ summary: 'Forward geocode address → coordinates (proxied)' })
+  @ApiOperation({ summary: 'Forward geocode address → coordinates (proxied) — public for registration' })
   async forward(@Query('address') address: string, @Query('q') q?: string) {
     const query = address ?? q;
     if (!query) return { success: true, data: [], message: 'No query' };
@@ -20,6 +18,8 @@ export class GeocodingController {
   }
 
   @Get('reverse')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Reverse geocode lat/lng → address (proxied)' })
   async reverse(@Query('lat') lat: string, @Query('lng') lng: string, @Query('lon') lon?: string) {
     const latitude = parseFloat(lat);

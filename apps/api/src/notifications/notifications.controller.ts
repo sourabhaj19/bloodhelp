@@ -11,6 +11,13 @@ import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decor
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Unread notification count for current user' })
+  async unreadCount(@CurrentUser() user: JwtPayload) {
+    const count = await this.notifications.unreadCount(user.sub);
+    return { success: true, data: { count }, message: 'Unread count' };
+  }
+
   @Get()
   @ApiOperation({ summary: 'List notifications for current user' })
   async list(@CurrentUser() user: JwtPayload, @Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('isRead') isRead?: string) {

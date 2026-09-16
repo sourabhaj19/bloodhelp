@@ -31,6 +31,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
     </p-card>
 
     <p-card *ngIf="!loading && result" header="Results" [subheader]="result.total + ' user(s)'">
+      <div class="desktop-table">
       <p-table [value]="result.items ?? []" styleClass="p-datatable-sm" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Map</th><th style="width: 220px">Actions</th></tr>
@@ -65,6 +66,23 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
           <tr><td colspan="6" class="text-center muted">No users found.</td></tr>
         </ng-template>
       </p-table>
+      </div>
+      <div class="mobile-cards">
+        <div *ngIf="!result.items?.length" class="text-center muted p-3">No users found.</div>
+        <div *ngFor="let u of result.items ?? []" class="mobile-card">
+          <div class="flex justify-content-between align-items-center mb-1">
+            <strong>{{ u.firstName }} {{ u.lastName }}</strong>
+            <p-tag [value]="u.role" [severity]="u.role === 'ADMIN' ? 'danger' : 'info'"></p-tag>
+          </div>
+          <div class="text-sm muted mb-1" style="word-break:break-all">{{ u.email }}</div>
+          <div class="mb-2"><p-tag [value]="u.active ? 'Active' : 'Inactive'" [severity]="u.active ? 'success' : 'warning'"></p-tag></div>
+          <div class="flex gap-2 flex-wrap">
+            <p-button *ngIf="u.latitude != null && u.longitude != null" label="View on map" icon="pi pi-map-marker" size="small" severity="secondary" [outlined]="true" (onClick)="focusOnMap(u)" styleClass="mobile-action"></p-button>
+            <p-button [label]="u.active ? 'Deactivate' : 'Activate'" size="small" severity="secondary" [outlined]="true" (onClick)="toggle(u)" styleClass="mobile-action"></p-button>
+            <p-button label="Delete" size="small" severity="danger" [outlined]="true" (onClick)="askRemove(u)" styleClass="mobile-action"></p-button>
+          </div>
+        </div>
+      </div>
       <p-paginator
         [rows]="pageSize"
         [totalRecords]="result.total ?? 0"
@@ -99,6 +117,20 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
       .page-title { margin: 0; font-size: 1.9rem; letter-spacing: -0.02em; }
       .page-sub { margin: 0.2rem 0 1rem; color: #667085; }
       .muted { color: #98a2b3; }
+      .desktop-table { display: block; }
+      .mobile-cards { display: none; }
+      .mobile-card {
+        border: 1px solid #eaecf0;
+        border-radius: 14px;
+        padding: 14px;
+        background: #fff;
+        margin-bottom: 12px;
+      }
+      :host ::ng-deep .mobile-action { min-height: 44px; }
+      @media (max-width: 767px) {
+        .desktop-table { display: none; }
+        .mobile-cards { display: block; }
+      }
     `,
   ],
 })

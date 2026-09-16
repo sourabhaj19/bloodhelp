@@ -48,6 +48,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
     </p-card>
 
     <p-card *ngIf="!loading && result" header="Trail" [subheader]="result.total + ' entries'">
+      <div class="desktop-table">
       <p-table [value]="result.items ?? []" styleClass="p-datatable-sm" responsiveLayout="scroll" [tableStyle]="{'min-width':'820px'}">
         <ng-template pTemplate="header">
           <tr>
@@ -76,6 +77,20 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
           <tr><td colspan="6" class="text-center muted">No audit entries for these filters.</td></tr>
         </ng-template>
       </p-table>
+      </div>
+      <div class="mobile-cards">
+        <div *ngIf="!result.items?.length" class="text-center muted p-3">No audit entries for these filters.</div>
+        <div *ngFor="let row of result.items ?? []" class="mobile-card">
+          <div class="flex justify-content-between align-items-center mb-1">
+            <p-tag [value]="row.action" severity="info"></p-tag>
+            <span class="text-sm muted">{{ row.createdAt | date:'short' }}</span>
+          </div>
+          <div class="text-sm mb-1"><strong>Entity:</strong> {{ row.entityType }}<div class="muted text-xs" style="word-break:break-all">{{ row.entityId }}</div></div>
+          <div class="text-sm mb-1"><strong>Actor:</strong> <span *ngIf="row.actor">{{ row.actor.firstName }} {{ row.actor.lastName }} <span class="muted">({{ row.actor.email }})</span></span><span *ngIf="!row.actor" class="muted">system</span></div>
+          <div class="text-sm muted mb-2">IP: {{ row.ipAddress || '—' }}</div>
+          <p-button label="Details" size="small" severity="secondary" [outlined]="true" (onClick)="open(row)" styleClass="w-full mobile-action"></p-button>
+        </div>
+      </div>
       <p-paginator
         [rows]="pageSize"
         [totalRecords]="result.total ?? 0"
@@ -119,6 +134,11 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
     .muted{color:#667085}
     .field label{display:block;margin-bottom:.45rem;font-weight:700;font-size:.87rem;color:#344054}
     .audit-json{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:.6rem;max-height:220px;overflow:auto;font-size:.82rem;white-space:pre-wrap;word-break:break-word}
+    .desktop-table{display:block}
+    .mobile-cards{display:none}
+    .mobile-card{border:1px solid #eaecf0;border-radius:12px;padding:14px;background:#fff;margin-bottom:10px}
+    :host ::ng-deep .mobile-action{min-height:44px}
+    @media(max-width:767px){.desktop-table{display:none}.mobile-cards{display:block}}
   `],
 })
 export class AuditLogsComponent implements OnInit {

@@ -121,9 +121,16 @@ export class NotificationsComponent implements OnInit {
     else this.router.navigate(['/reports'], { queryParams: { reportId } });
   }
 
+  private broadcast() {
+    try {
+      localStorage.setItem('bloodhelp:notifs', String(Date.now()));
+      window.dispatchEvent(new CustomEvent('bloodhelp:notifs'));
+    } catch {}
+  }
+
   mark(n: any) {
     this.http.patch<any>(`/api/notifications/${n.id}/read`, {}).subscribe({
-      next: () => { n.isRead = true; this.cdr.markForCheck(); },
+      next: () => { n.isRead = true; this.cdr.markForCheck(); this.broadcast(); },
       error: (e) => this.errors.handleHttpError(e, 'Failed to mark as read'),
     });
   }
@@ -132,6 +139,7 @@ export class NotificationsComponent implements OnInit {
     this.http.patch<any>(`/api/notifications/read-all`, {}).subscribe({
       next: () => {
         this.errors.showSuccess('All notifications marked as read.');
+        this.broadcast();
         this.load();
       },
       error: (e) => this.errors.handleHttpError(e, 'Failed to mark all as read'),

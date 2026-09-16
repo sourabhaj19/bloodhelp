@@ -95,7 +95,8 @@ interface DashboardData {
             <span class="stat-icon red big"><i class="pi pi-map-marker"></i></span>
             <div>
               <div class="font-bold">{{ data.myLocation.area }}</div>
-              <div class="muted text-sm">{{ data.myLocation.latitude }}, {{ data.myLocation.longitude }}</div>
+              <div class="muted text-sm">Location saved — nearby donors are calculated from here</div>
+              <div class="muted text-xs" style="color:#98a2b3" [pTooltip]="data.myLocation.latitude + ', ' + data.myLocation.longitude" tooltipPosition="bottom">Precise location set · update in Profile</div>
             </div>
           </div>
           <p-divider></p-divider>

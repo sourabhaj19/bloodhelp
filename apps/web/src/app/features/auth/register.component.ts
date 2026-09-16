@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 import { SharedUiModule } from '../../shared/shared-ui.module';
+
+declare const L: any;
 
 @Component({
   standalone: true,
@@ -213,27 +215,27 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         </p>
       </p-card>
 
-      <!-- Location consent: lat/long are mandatory for donor matching,
-           so capture them here before the account is created. -->
+      <!-- Location: two options only — GPS or pick on map -->
       <p-dialog
         [(visible)]="locationDialog"
         header="Share your location"
         [modal]="true"
         [dismissableMask]="true"
         [draggable]="false"
-        [style]="{ width: 'min(480px, 94vw)' }"
+        [style]="{ width: 'min(560px, 96vw)' }"
+        (onHide)="onLocationDialogHide()"
       >
         <p class="mt-0 consent-text">
-          BloodHelp matches donors by distance, so we need your location to create
-          your account. Your coordinates are only used for donor matching.
+          BloodHelp matches donors by distance, so we need your location. Choose GPS for fastest, or pick your location directly on the map.
         </p>
 
         <p-message *ngIf="locationError" severity="error" [text]="locationError" styleClass="w-full mb-3"></p-message>
-        <p-message *ngIf="locationCaptured" severity="success" text="Location captured — you're all set!" styleClass="w-full mb-3"></p-message>
+        <p-message *ngIf="locationCaptured" severity="success" [text]="'Location captured: ' + form.latitude + ', ' + form.longitude + (locationAccuracy ? ' (±' + locationAccuracy + 'm)' : '') + ' — you can now create your account!'" styleClass="w-full mb-3"></p-message>
+        <p-message *ngIf="locationCaptured && locationAccuracy && locationAccuracy > 500" severity="warn" text="Accuracy is low — please drag the pin on the map to your exact location for better donor matching." styleClass="w-full mb-3"></p-message>
 
         <div *ngIf="locating" class="flex align-items-center gap-2 mb-3">
           <p-progressSpinner [style]="{ width: '28px', height: '28px' }" strokeWidth="5"></p-progressSpinner>
-          <span class="muted">Getting your location…</span>
+          <span class="muted">Getting your location… (this may take a few seconds for high accuracy)</span>
         </div>
 
         <div class="flex flex-column gap-2">
@@ -246,6 +248,25 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
             (onClick)="useMyLocation()"
             styleClass="w-full"
           ></p-button>
+          <small class="hint text-center">Fastest — uses your device GPS. Allow permission when prompted.</small>
+
+          <p-divider layout="horizontal" align="center"><span class="muted text-xs" style="color:#98a2b3">or</span></p-divider>
+
+          <p-button
+            type="button"
+            [label]="showMapPicker ? 'Hide map picker' : 'Pick location on map'"
+            icon="pi pi-map"
+            severity="secondary"
+            [outlined]="true"
+            (onClick)="toggleMapPicker()"
+            styleClass="w-full"
+          ></p-button>
+
+          <div *ngIf="showMapPicker" class="pick-map-wrap mt-2">
+            <div #pickMapEl class="pick-map"></div>
+            <small class="hint">Click anywhere on the map to set your precise location. Click again to adjust. You can also drag the pin.</small>
+            <small *ngIf="locationCaptured" class="captured-coords">Selected: {{ form.latitude }}, {{ form.longitude }}<span *ngIf="locationAccuracy"> (±{{ locationAccuracy }}m)</span></small>
+          </div>
         </div>
 
         <ng-template pTemplate="footer">
@@ -286,8 +307,6 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
       .mobile-wrap .mobile-input { border-radius: 0 6px 6px 0 !important; }
       .consent-text { color: #475467; line-height: 1.55; }
       .muted { color: #667085; font-size: 0.9rem; }
-      /* Attached DOB calendar trigger: unlayered so it wins over the
-         library's @layer rules and the global .p-button radius skin */
       :host ::ng-deep .dob-calendar { display: flex; width: 100%; }
       :host ::ng-deep .dob-calendar .p-inputtext { flex: 1 1 auto; width: 1%; min-width: 0; }
       :host ::ng-deep .dob-calendar.p-calendar-w-btn .p-inputtext {
@@ -300,6 +319,27 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         border-top-left-radius: 0;
         border-bottom-left-radius: 0;
       }
+      .pick-map-wrap {
+        border: 1px solid #eaecf0;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f9fafb;
+        padding: 0;
+      }
+      .pick-map {
+        width: 100%;
+        height: 260px;
+        background: #f2f4f7;
+        z-index: 0;
+      }
+      .pick-map-wrap .hint { display: block; padding: 0.5rem 0.75rem 0.25rem; }
+      .captured-coords {
+        display: block;
+        padding: 0 0.75rem 0.6rem;
+        color: #067647;
+        font-weight: 600;
+        font-size: 0.8rem;
+      }
     `,
   ],
 })
@@ -309,6 +349,8 @@ export class RegisterComponent implements OnInit {
   private router = inject(Router);
   private errors = inject(ErrorHandlerService);
   private cdr = inject(ChangeDetectorRef);
+
+  @ViewChild('pickMapEl') pickMapEl?: ElementRef<HTMLDivElement>;
 
   bloodGroups: any[] = [];
   countryCodes: any[] = [];
@@ -322,11 +364,16 @@ export class RegisterComponent implements OnInit {
   dob: Date | null = new Date('1995-06-15');
   maxDob = new Date();
 
-  // Location consent state — lat/long are mandatory, captured in the dialog.
+  // Location consent state — lat/long are mandatory, captured via GPS or map picker.
   locationDialog = false;
   locating = false;
   locationCaptured = false;
   locationError = '';
+  locationAccuracy: number | null = null;
+
+  showMapPicker = false;
+  private pickMap: any = null;
+  private pickMarker: any = null;
 
   form: any = {
     firstName: '',
@@ -511,36 +558,180 @@ export class RegisterComponent implements OnInit {
     }
     this.locationError = '';
     this.locationDialog = true;
+    this.cdr.markForCheck();
+    // If map picker was previously opened, re-init after dialog animation
+    if (this.showMapPicker) setTimeout(() => this.initPickMap(), 300);
+  }
+
+  onLocationDialogHide() {
+    // Keep captured state so Confirm stays enabled; but clean up map to avoid leaks
+    if (!this.showMapPicker) return;
+  }
+
+  toggleMapPicker() {
+    this.showMapPicker = !this.showMapPicker;
+    this.cdr.markForCheck();
+    if (this.showMapPicker) {
+      setTimeout(() => this.initPickMap(), 150);
+    } else {
+      this.destroyPickMap();
+    }
+  }
+
+  private initPickMap() {
+    if (typeof L === 'undefined' || !this.pickMapEl?.nativeElement) return;
+    if (this.pickMap) {
+      try {
+        this.pickMap.invalidateSize();
+      } catch {}
+      return;
+    }
+    try {
+      const lat = Number(this.form.latitude) || 20.5937;
+      const lng = Number(this.form.longitude) || 78.9629;
+      const hasValid = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+      const center: [number, number] = hasValid ? [lat, lng] : [20.5937, 78.9629];
+      const zoom = hasValid && this.locationCaptured ? 13 : 5;
+      this.pickMap = L.map(this.pickMapEl.nativeElement, {
+        attributionControl: true,
+        zoomControl: true,
+      });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(this.pickMap);
+      this.pickMap.setView(center, zoom);
+      if (hasValid) this.updatePickMarker();
+      this.pickMap.on('click', (e: any) => {
+        const ll = e?.latlng;
+        if (!ll || !Number.isFinite(ll.lat) || !Number.isFinite(ll.lng)) return;
+        this.form.latitude = Number(Number(ll.lat).toFixed(6));
+        this.form.longitude = Number(Number(ll.lng).toFixed(6));
+        this.locationCaptured = true;
+        this.locationError = '';
+        this.errors.showSuccess('Location picked on map.');
+        this.updatePickMarker();
+        this.cdr.markForCheck();
+      });
+      setTimeout(() => {
+        try {
+          this.pickMap?.invalidateSize();
+        } catch {}
+      }, 200);
+    } catch (e) {
+      this.locationError = 'Map could not be loaded. Please use GPS.';
+      this.cdr.markForCheck();
+    }
+  }
+
+  private updatePickMarker() {
+    if (!this.pickMap || typeof L === 'undefined') return;
+    const lat = Number(this.form.latitude);
+    const lng = Number(this.form.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    try {
+      if (this.pickMarker) {
+        this.pickMarker.setLatLng([lat, lng]);
+      } else {
+        this.pickMarker = L.marker([lat, lng], { draggable: true }).addTo(this.pickMap);
+        this.pickMarker.on('dragend', () => {
+          const ll = this.pickMarker.getLatLng();
+          this.form.latitude = Number(Number(ll.lat).toFixed(6));
+          this.form.longitude = Number(Number(ll.lng).toFixed(6));
+          this.locationCaptured = true;
+          this.locationError = '';
+          this.cdr.markForCheck();
+        });
+      }
+      // Center map gently on new selection
+      try {
+        this.pickMap.setView([lat, lng], Math.max(this.pickMap.getZoom(), 13));
+      } catch {}
+    } catch {}
+  }
+
+  private destroyPickMap() {
+    try {
+      this.pickMap?.remove();
+    } catch {}
+    this.pickMap = null;
+    this.pickMarker = null;
   }
 
   useMyLocation() {
     this.locationError = '';
+    this.locationAccuracy = null;
     if (!navigator.geolocation) {
-      this.locationError = 'Geolocation is not supported by your browser.';
+      this.locationError = 'Geolocation is not supported by your browser. Pick your location on the map below.';
+      this.cdr.markForCheck();
+      return;
+    }
+    // Must be secure context (https or localhost) — otherwise browser blocks geolocation
+    if (typeof window !== 'undefined' && (window as any).isSecureContext === false) {
+      this.locationError = 'Geolocation needs a secure connection (https or localhost). Please pick on the map instead.';
+      this.cdr.markForCheck();
       return;
     }
     this.locating = true;
     this.cdr.markForCheck();
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        this.form.latitude = Number(pos.coords.latitude.toFixed(6));
-        this.form.longitude = Number(pos.coords.longitude.toFixed(6));
-        this.locationCaptured = true;
-        this.locating = false;
-        this.locationError = '';
+
+    const handleSuccess = (pos: GeolocationPosition) => {
+      const acc = pos.coords.accuracy;
+      this.locationAccuracy = acc != null ? Math.round(acc) : null;
+      this.form.latitude = Number(pos.coords.latitude.toFixed(6));
+      this.form.longitude = Number(pos.coords.longitude.toFixed(6));
+      this.locationCaptured = true;
+      this.locating = false;
+      this.locationError = '';
+      if (acc != null && acc > 1000) {
+        this.errors.showWarn(`Location captured but accuracy is low (±${Math.round(acc)} m). Please drag the pin on the map for precision.`);
+        if (!this.showMapPicker) this.toggleMapPicker();
+      } else if (acc != null && acc > 200) {
+        this.errors.showInfo(`Location captured (±${Math.round(acc)} m). You can fine-tune by dragging the pin on the map.`);
+      } else if (acc != null) {
+        this.errors.showSuccess(`Location captured (±${Math.round(acc)} m).`);
+      } else {
         this.errors.showSuccess('Location captured.');
-        this.cdr.markForCheck();
-      },
-      (err) => {
-        this.locating = false;
-        this.locationError =
-          err?.code === err?.PERMISSION_DENIED
-            ? 'Location permission was denied. Please allow location access and try again.'
-            : 'Unable to get your location. Please try again.';
-        this.cdr.markForCheck();
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
-    );
+      }
+      if (this.showMapPicker) this.updatePickMarker();
+      this.cdr.markForCheck();
+    };
+
+    const handleLowFail = (err: GeolocationPositionError) => {
+      this.locating = false;
+      const code = (err as any)?.code;
+      if (code === 1) {
+        this.locationError = 'Location permission was denied. Please pick your location on the map below — no GPS needed.';
+        if (!this.showMapPicker) setTimeout(() => this.toggleMapPicker(), 200);
+      } else if (code === 3) {
+        this.locationError = 'Location request timed out. Try again, move near a window/outdoors, or pick on the map.';
+      } else if (code === 2) {
+        this.locationError = `Location unavailable: ${err.message || 'no position'}. Try again or pick on the map.`;
+      } else {
+        this.locationError = `Unable to get your location: ${err.message || 'unknown error'}. Please pick on the map below.`;
+      }
+      this.cdr.markForCheck();
+    };
+
+    const handleHighFail = (err: GeolocationPositionError) => {
+      const code = (err as any)?.code;
+      // On timeout / unavailable, retry with low accuracy (faster, uses WiFi/cell)
+      if (code === 3 || code === 2) {
+        navigator.geolocation.getCurrentPosition(handleSuccess, handleLowFail, {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      } else {
+        handleLowFail(err);
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(handleSuccess, handleHighFail, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    });
   }
 
   /** Fired from the consent dialog — location must be captured first. */

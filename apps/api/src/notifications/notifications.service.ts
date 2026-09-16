@@ -32,4 +32,8 @@ export class NotificationsService {
     await this.prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
     return { updated: true };
   }
+
+  async unreadCount(userId: string): Promise<number> {
+    return this.prisma.notification.count({ where: { userId, isRead: false } });
+  }
 }

@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewChild, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subject, debounceTime } from 'rxjs';
 import { SharedUiModule } from '../../shared/shared-ui.module';
 import { DonorMapComponent } from '../../shared/components/donor-map.component';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
@@ -33,18 +34,23 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         </div>
         <div class="field col-12 md:col-4">
           <label for="area">Area</label>
-          <input pInputText id="area" [(ngModel)]="filters.area" placeholder="Area / locality" class="w-full" />
+          <input pInputText id="area" [(ngModel)]="filters.area" placeholder="Area / locality" class="w-full" (ngModelChange)="scheduleSearch()" />
         </div>
         <div class="field col-12 md:col-4">
           <label for="radius">Radius</label>
           <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
+          <small *ngIf="filters.radiusKm && filters.lat == null" class="p-error block mt-1">Radius needs location — click “Near me” first (filter will be ignored).</small>
         </div>
         <div class="col-12 flex align-items-end gap-2 flex-wrap">
           <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
           <p-button label="Near me" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()" pTooltip="Use GPS location for distance + radius"></p-button>
           <p-button label="View all on map" icon="pi pi-map" severity="secondary" [outlined]="true" (onClick)="showAllOnMap()" [disabled]="loading || mappableCount === 0" pTooltip="Fit all donor pins into the map view below"></p-button>
           <p-button label="Reset" severity="secondary" [text]="true" (onClick)="reset()"></p-button>
+          <span *ngIf="filters.lat != null" class="muted text-sm ml-2" [pTooltip]="filters.lat + ', ' + filters.lng" tooltipPosition="bottom">📍 Location enabled · distance shown</span>
+          <p-button *ngIf="filters.lat != null" label="Clear location" icon="pi pi-times" severity="secondary" [text]="true" (onClick)="clearLocation()"></p-button>
         </div>
+        <small class="muted" *ngIf="filters.lat == null && !filters.radiusKm">Tip: click <strong>Near me</strong> to enable the <strong>Distance</strong> column and radius filtering.</small>
+        <p-message *ngIf="filters.lat == null && filters.radiusKm" severity="warn" text="You set a radius but location is off — enable “Near me” to filter by distance." styleClass="w-full mt-2"></p-message>
       </div>
     </p-card>
 
@@ -55,6 +61,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
     </p-card>
 
     <p-card *ngIf="!loading && result" header="Donors" [subheader]="result.total + ' found'">
+      <div class="desktop-table">
       <p-table [value]="result.items ?? []" styleClass="p-datatable-sm" responsiveLayout="scroll">
         <ng-template pTemplate="header">
           <tr><th>Name</th><th>Blood</th><th>Mobile</th><th>Address</th><th>Distance</th><th>Map</th><th></th></tr>
@@ -90,6 +97,25 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <tr><td colspan="7" class="text-center muted">No donors match. Try a wider radius.</td></tr>
         </ng-template>
       </p-table>
+      </div>
+      <!-- Mobile cards -->
+      <div class="mobile-cards">
+        <div *ngIf="!result.items?.length" class="text-center muted p-3">No donors match. Try a wider radius.</div>
+        <div *ngFor="let d of result.items ?? []" class="mobile-card">
+          <div class="flex justify-content-between align-items-center mb-2">
+            <strong>{{ d.displayName || d.fullName }}</strong>
+            <p-tag [value]="d.bloodGroup" severity="danger"></p-tag>
+          </div>
+          <div class="text-sm mb-1"><i class="pi pi-phone mr-1 muted"></i>{{ d.mobile || d.maskedMobile || '—' }}</div>
+          <div class="text-sm mb-1"><i class="pi pi-map-marker mr-1 muted"></i>{{ d.state }}<span *ngIf="d.city"> · {{ d.city }}</span><span *ngIf="d.area"> · {{ d.area }}</span><span *ngIf="d.pinCode"> — {{ d.pinCode }}</span></div>
+          <div class="text-sm mb-2"><span *ngIf="d.approxDistanceKm != null" class="font-bold" style="color:#b42318">~{{ d.approxDistanceKm }} km away</span><span *ngIf="d.approxDistanceKm == null" class="muted">Distance — enable “Near me”</span></div>
+          <div class="flex gap-2 flex-wrap">
+            <p-button *ngIf="d.latitude && d.longitude" label="View on map" icon="pi pi-map-marker" size="small" severity="secondary" [outlined]="true" (onClick)="focusOnMap(d)" styleClass="mobile-action"></p-button>
+            <p-button label="Thank" icon="pi pi-heart" size="small" severity="secondary" [outlined]="true" (onClick)="thank(d)" styleClass="mobile-action"></p-button>
+            <p-button *ngIf="d.id !== myId" icon="pi pi-flag" label="Report" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" styleClass="mobile-action"></p-button>
+          </div>
+        </div>
+      </div>
       <p-paginator
         [rows]="filters.pageSize"
         [totalRecords]="result.total ?? 0"
@@ -143,13 +169,29 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       .page-sub { margin: 0.2rem 0 1rem; color: #667085; }
       .field label { display: block; margin-bottom: 0.4rem; }
       .muted { color: #98a2b3; }
+      .desktop-table { display: block; }
+      .mobile-cards { display: none; }
+      .mobile-card {
+        border: 1px solid #eaecf0;
+        border-radius: 14px;
+        padding: 14px;
+        background: #fff;
+        margin-bottom: 12px;
+      }
+      :host ::ng-deep .mobile-action { min-height: 44px; }
+      @media (max-width: 767px) {
+        .desktop-table { display: none; }
+        .mobile-cards { display: block; }
+      }
     `,
   ],
 })
-export class DonorsComponent implements OnInit {
+export class DonorsComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
   private errors = inject(ErrorHandlerService);
   private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   bloodGroups: any[] = [];
   countries: any[] = [];
@@ -176,21 +218,25 @@ export class DonorsComponent implements OnInit {
   report: any = { reasonId: '', description: '' };
   filters: any = { bloodGroupId: '', countryId: '', stateId: '', cityId: '', area: '', radiusKm: '', lat: null, lng: null, page: 1, pageSize: 20 };
   private defaultCountryId = '';
+  private searchSubject = new Subject<void>();
+  private searchSub: any = null;
 
   ngOnInit() {
     this.http.get<any>('/api/master/blood-groups').subscribe({
       next: (r) => { this.bloodGroups = r.data ?? r; this.cdr.markForCheck(); },
       error: () => {},
     });
+    this.applyQueryParams();
+    this.searchSub = this.searchSubject.pipe(debounceTime(300)).subscribe(() => this.doSearch());
     // Load profile first so the initial search already carries lat/lng —
     // that way distance is calculated on first load without needing "Near me".
+    // If URL already has lat/lng, keep URL over profile.
+    const hasUrlLat = this.filters.lat != null;
     this.http.get<any>('/api/users/me').subscribe({
       next: (r) => {
         const me = r.data ?? r;
         this.myId = me?.id || '';
-        // Keep profile location silently for map center / radius distance —
-        // no lat/lng inputs are shown in the filter UI anymore.
-        if (me?.latitude != null && me?.longitude != null && this.filters.lat == null) {
+        if (!hasUrlLat && me?.latitude != null && me?.longitude != null && this.filters.lat == null) {
           this.filters.lat = me.latitude;
           this.filters.lng = me.longitude;
         }
@@ -199,6 +245,40 @@ export class DonorsComponent implements OnInit {
       },
       error: () => this.loadCountries(),
     });
+  }
+
+  ngOnDestroy() { this.searchSub?.unsubscribe(); }
+
+  scheduleSearch() { this.searchSubject.next(); }
+
+  private applyQueryParams() {
+    const qp = this.route.snapshot.queryParamMap;
+    const get = (k: string) => qp.get(k) ?? '';
+    if (get('bloodGroupId')) this.filters.bloodGroupId = get('bloodGroupId');
+    if (get('countryId')) this.filters.countryId = get('countryId');
+    if (get('stateId')) this.filters.stateId = get('stateId');
+    if (get('cityId')) this.filters.cityId = get('cityId');
+    if (get('area')) this.filters.area = get('area');
+    if (get('radiusKm')) this.filters.radiusKm = get('radiusKm');
+    if (get('lat')) this.filters.lat = Number(get('lat'));
+    if (get('lng')) this.filters.lng = Number(get('lng'));
+    if (get('page')) this.filters.page = Number(get('page')) || 1;
+    if (get('pageSize')) this.filters.pageSize = Number(get('pageSize')) || 20;
+  }
+
+  private syncUrl() {
+    const qp: any = {};
+    if (this.filters.bloodGroupId) qp.bloodGroupId = this.filters.bloodGroupId;
+    if (this.filters.countryId) qp.countryId = this.filters.countryId;
+    if (this.filters.stateId) qp.stateId = this.filters.stateId;
+    if (this.filters.cityId) qp.cityId = this.filters.cityId;
+    if (this.filters.area) qp.area = this.filters.area;
+    if (this.filters.radiusKm) qp.radiusKm = this.filters.radiusKm;
+    if (this.filters.lat != null) qp.lat = String(this.filters.lat);
+    if (this.filters.lng != null) qp.lng = String(this.filters.lng);
+    qp.page = String(this.filters.page);
+    qp.pageSize = String(this.filters.pageSize);
+    this.router.navigate([], { relativeTo: this.route, queryParams: qp, replaceUrl: true });
   }
 
   private pickDefaultCountry(list: any[]): string {
@@ -217,6 +297,8 @@ export class DonorsComponent implements OnInit {
         if (this.defaultCountryId && !this.filters.countryId) {
           this.filters.countryId = this.defaultCountryId;
           this.onCountryChange();
+        } else if (this.filters.countryId) {
+          this.onCountryChange(true);
         }
         this.search();
         this.cdr.markForCheck();
@@ -225,14 +307,32 @@ export class DonorsComponent implements OnInit {
     });
   }
 
-  onCountryChange() {
-    this.states = [];
-    this.cities = [];
-    this.filters.stateId = '';
-    this.filters.cityId = '';
+  onCountryChange(preserve = false) {
+    const keepState = preserve ? this.filters.stateId : '';
+    const keepCity = preserve ? this.filters.cityId : '';
+    if (!preserve) {
+      this.states = [];
+      this.cities = [];
+      this.filters.stateId = '';
+      this.filters.cityId = '';
+    }
     if (!this.filters.countryId) { this.cdr.markForCheck(); return; }
     this.http.get<any>(`/api/master/countries/${this.filters.countryId}/states`).subscribe({
-      next: (r) => { this.states = r.data ?? r ?? []; this.cdr.markForCheck(); },
+      next: (r) => {
+        this.states = r.data ?? r ?? [];
+        if (preserve && keepState) {
+          this.filters.stateId = keepState;
+          this.http.get<any>(`/api/master/states/${keepState}/cities`).subscribe({
+            next: (cr) => {
+              this.cities = cr.data ?? cr ?? [];
+              if (keepCity) this.filters.cityId = keepCity;
+              this.cdr.markForCheck();
+            },
+            error: () => this.cdr.markForCheck(),
+          });
+        }
+        this.cdr.markForCheck();
+      },
       error: () => {},
     });
   }
@@ -352,6 +452,11 @@ export class DonorsComponent implements OnInit {
   }
 
   search() {
+    this.syncUrl();
+    this.doSearch();
+  }
+
+  private doSearch() {
     this.loading = true;
     this.error = '';
     this.cdr.markForCheck();
@@ -401,16 +506,41 @@ export class DonorsComponent implements OnInit {
       this.errors.showWarn('Geolocation is not supported by your browser.');
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        this.filters.lat = Number(pos.coords.latitude.toFixed(6));
-        this.filters.lng = Number(pos.coords.longitude.toFixed(6));
-        this.filters.radiusKm = '10';
-        this.cdr.markForCheck();
-        this.search();
-      },
-      () => this.errors.showWarn('Unable to get your location. Please allow location access.'),
-    );
+    if (typeof window !== 'undefined' && (window as any).isSecureContext === false) {
+      this.errors.showWarn('Geolocation needs https or localhost.');
+      return;
+    }
+    const onSuccess = (pos: GeolocationPosition) => {
+      const acc = pos.coords.accuracy;
+      this.filters.lat = Number(pos.coords.latitude.toFixed(6));
+      this.filters.lng = Number(pos.coords.longitude.toFixed(6));
+      this.filters.radiusKm = '10';
+      if (acc != null && acc > 1000) this.errors.showWarn(`Location found but low accuracy (±${Math.round(acc)} m).`);
+      else if (acc != null && acc > 200) this.errors.showInfo(`Location captured (±${Math.round(acc)} m).`);
+      this.cdr.markForCheck();
+      this.search();
+    };
+    const onLowFail = (err: GeolocationPositionError) => {
+      const c = (err as any)?.code;
+      if (c === 1) this.errors.showWarn('Location permission denied.');
+      else if (c === 3) this.errors.showWarn('Location timed out. Try outdoors.');
+      else this.errors.showWarn(`Location failed: ${err.message || 'unavailable'}.`);
+    };
+    const onHighFail = (err: GeolocationPositionError) => {
+      const c = (err as any)?.code;
+      if (c === 3 || c === 2) {
+        navigator.geolocation.getCurrentPosition(onSuccess, onLowFail, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
+      } else onLowFail(err);
+    };
+    navigator.geolocation.getCurrentPosition(onSuccess, onHighFail, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  }
+
+  clearLocation() {
+    this.filters.lat = null;
+    this.filters.lng = null;
+    this.filters.radiusKm = '';
+    this.cdr.markForCheck();
+    this.search();
   }
 
   async thank(donor: any) {

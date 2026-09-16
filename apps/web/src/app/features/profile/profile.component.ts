@@ -272,15 +272,32 @@ export class ProfileComponent implements OnInit {
       this.errors.showWarn('Geolocation is not supported by your browser.');
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        this.profile.latitude = Number(pos.coords.latitude.toFixed(6));
-        this.profile.longitude = Number(pos.coords.longitude.toFixed(6));
-        this.cdr.markForCheck();
-        this.errors.showSuccess('Location updated. Remember to save.');
-      },
-      () => this.errors.showWarn('Unable to get your location.'),
-    );
+    if (typeof window !== 'undefined' && (window as any).isSecureContext === false) {
+      this.errors.showWarn('Geolocation needs https or localhost. Please pick on map or save manually.');
+      return;
+    }
+    const onSuccess = (pos: GeolocationPosition) => {
+      const acc = pos.coords.accuracy;
+      this.profile.latitude = Number(pos.coords.latitude.toFixed(6));
+      this.profile.longitude = Number(pos.coords.longitude.toFixed(6));
+      this.cdr.markForCheck();
+      if (acc != null && acc > 1000) this.errors.showWarn(`Location captured but low accuracy (±${Math.round(acc)} m). Drag pin on map or save anyway.`);
+      else if (acc != null && acc > 200) this.errors.showInfo(`Location captured (±${Math.round(acc)} m). Remember to save.`);
+      else this.errors.showSuccess(`Location updated (±${acc != null ? Math.round(acc) + ' m' : 'high accuracy'}). Remember to save.`);
+    };
+    const onLowFail = (err: GeolocationPositionError) => {
+      const c = (err as any)?.code;
+      if (c === 1) this.errors.showWarn('Location permission denied — allow or pick on map.');
+      else if (c === 3) this.errors.showWarn('Location timed out. Try outdoors or use map picker.');
+      else this.errors.showWarn(`Location failed: ${err.message || 'unavailable'}.`);
+    };
+    const onHighFail = (err: GeolocationPositionError) => {
+      const c = (err as any)?.code;
+      if (c === 3 || c === 2) {
+        navigator.geolocation.getCurrentPosition(onSuccess, onLowFail, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
+      } else onLowFail(err);
+    };
+    navigator.geolocation.getCurrentPosition(onSuccess, onHighFail, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   }
 
   save() {
