@@ -3,9 +3,14 @@ import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
 export function roleGuard(allowed: Array<'USER' | 'ADMIN'>): CanActivateFn {
-  return () => {
+  return async (_route, state) => {
     const auth = inject(AuthService);
     const router = inject(Router);
+    await auth.ensureInitialized();
+    if (!auth.isAuthenticated()) {
+      router.navigate(['/login'], { queryParams: { returnUrl: state.url } });
+      return false;
+    }
     const user = auth.user();
     if (user && allowed.includes(user.role)) return true;
     // Per §8: non-admins redirected to /dashboard with a toast (toast wiring in Phase 4)

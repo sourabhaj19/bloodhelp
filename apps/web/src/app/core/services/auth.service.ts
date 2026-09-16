@@ -18,15 +18,64 @@ export class AuthService {
 
   private _accessToken = signal<string | null>(null);
   private _user = signal<AuthUser | null>(null);
+  private _initialized = signal(false);
+  private initPromise: Promise<void> | null = null;
 
   readonly accessToken = this._accessToken.asReadonly();
   readonly user = this._user.asReadonly();
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly isAdmin = computed(() => this._user()?.role === 'ADMIN');
+  readonly initialized = this._initialized.asReadonly();
+
+  constructor() {
+    // Cross-tab sync: tokens live in memory per tab, cookies are shared.
+    // A logout/login in one tab broadcasts so other tabs follow without
+    // waiting for their next 401.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'bloodhelp:logout') {
+          this._accessToken.set(null);
+          this._user.set(null);
+          if (this.isProtectedUrl(this.router.url)) this.router.navigate(['/login']);
+        } else if (e.key === 'bloodhelp:login') {
+          if (!this._accessToken() && this._initialized()) void this.restoreSession();
+        }
+      });
+    }
+  }
+
+  private isProtectedUrl(url: string): boolean {
+    return (
+      url.startsWith('/dashboard') ||
+      url.startsWith('/donors') ||
+      url.startsWith('/appreciations') ||
+      url.startsWith('/profile') ||
+      url.startsWith('/change-password') ||
+      url.startsWith('/notifications') ||
+      url.startsWith('/reports') ||
+      url.startsWith('/admin')
+    );
+  }
+
+  private broadcast(key: 'bloodhelp:login' | 'bloodhelp:logout'): void {
+    try {
+      localStorage.setItem(key, String(Date.now()));
+    } catch {
+      /* private mode — cross-tab sync best-effort only */
+    }
+  }
+
+  /** Resolve once the initial session-restore attempt has finished. */
+  ensureInitialized(): Promise<void> {
+    if (this._initialized()) return Promise.resolve();
+    if (!this.initPromise) this.initPromise = this.restoreSession();
+    return this.initPromise;
+  }
 
   setSession(token: string, user: AuthUser) {
     this._accessToken.set(token);
     this._user.set(user);
+    this._initialized.set(true);
   }
 
   clearSession() {
@@ -44,6 +93,7 @@ export class AuthService {
     );
     const data = res.data ?? res;
     this.setSession(data.accessToken, data.user);
+    this.broadcast('bloodhelp:login');
   }
 
   async register(payload: any): Promise<void> {
@@ -52,6 +102,7 @@ export class AuthService {
     );
     const data = res.data ?? res;
     this.setSession(data.accessToken, data.user);
+    this.broadcast('bloodhelp:login');
   }
 
   async logout(): Promise<void> {
@@ -59,6 +110,7 @@ export class AuthService {
       await firstValueFrom(this.http.post('/api/auth/logout', {}, { withCredentials: true }));
     } finally {
       this.clearSession();
+      this.broadcast('bloodhelp:logout');
       this.router.navigate(['/login']);
     }
   }
@@ -86,6 +138,8 @@ export class AuthService {
       this._user.set({ id: u.id, firstName: u.firstName, lastName: u.lastName, role: u.role, email: u.email });
     } catch {
       this.clearSession();
+    } finally {
+      this._initialized.set(true);
     }
   }
 

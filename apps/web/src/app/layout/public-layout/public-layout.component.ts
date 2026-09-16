@@ -1,6 +1,8 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { SharedUiModule } from '../../shared/shared-ui.module';
+import { AuthService } from '../../core/services/auth.service';
+import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
 @Component({
   standalone: true,
@@ -22,8 +24,15 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
       </nav>
 
       <div class="topbar-actions">
-        <a routerLink="/login" class="login-link hide-sm">Log in</a>
-        <span class="hide-sm"><p-button label="Donate now" icon="pi pi-heart" routerLink="/register"></p-button></span>
+        <ng-container *ngIf="!auth.isAuthenticated(); else loggedIn">
+          <a routerLink="/login" class="login-link hide-sm">Log in</a>
+          <span class="hide-sm"><p-button label="Donate now" icon="pi pi-heart" routerLink="/register"></p-button></span>
+        </ng-container>
+        <ng-template #loggedIn>
+          <span class="hide-sm muted text-sm mr-1">{{ auth.user()?.firstName }}</span>
+          <span class="hide-sm"><p-button label="Dashboard" icon="pi pi-th-large" routerLink="/dashboard" severity="secondary" [outlined]="true"></p-button></span>
+          <p-button icon="pi pi-sign-out" severity="secondary" [text]="true" [rounded]="true" (onClick)="logout()" pTooltip="Logout" tooltipPosition="bottom" styleClass="hide-sm"></p-button>
+        </ng-template>
         <p-button icon="pi pi-bars" severity="secondary" [outlined]="true" styleClass="mobile-btn" (onClick)="sidebar = true" ariaLabel="Open menu"></p-button>
       </div>
     </header>
@@ -37,8 +46,15 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
         <a routerLink="/blood-information" routerLinkActive="active" (click)="sidebar = false" class="side-link">Blood Information</a>
         <a routerLink="/search" routerLinkActive="active" (click)="sidebar = false" class="side-link">Find Donors</a>
         <p-divider></p-divider>
-        <a routerLink="/login" (click)="sidebar = false" class="side-link">Log in</a>
-        <p-button label="Donate now" icon="pi pi-heart" routerLink="/register" (onClick)="sidebar = false" styleClass="w-full mt-2"></p-button>
+        <ng-container *ngIf="!auth.isAuthenticated(); else loggedInMobile">
+          <a routerLink="/login" (click)="sidebar = false" class="side-link">Log in</a>
+          <p-button label="Donate now" icon="pi pi-heart" routerLink="/register" (onClick)="sidebar = false" styleClass="w-full mt-2"></p-button>
+        </ng-container>
+        <ng-template #loggedInMobile>
+          <a routerLink="/dashboard" (click)="sidebar = false" class="side-link">Dashboard</a>
+          <a routerLink="/profile" (click)="sidebar = false" class="side-link">Profile</a>
+          <p-button label="Logout" icon="pi pi-sign-out" severity="secondary" [outlined]="true" styleClass="w-full mt-2" (onClick)="logout()"></p-button>
+        </ng-template>
       </div>
     </p-sidebar>
 
@@ -91,6 +107,19 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
   ],
 })
 export class PublicLayoutComponent {
+  auth = inject(AuthService);
+  private router = inject(Router);
+  private toast = inject(ErrorHandlerService);
   sidebar = false;
   year = new Date().getFullYear();
+
+  async logout() {
+    this.sidebar = false;
+    try {
+      await this.auth.logout();
+      this.toast.showSuccess('You have been logged out.');
+    } catch {
+      this.router.navigate(['/login']);
+    }
+  }
 }

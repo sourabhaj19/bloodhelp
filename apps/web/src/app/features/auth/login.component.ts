@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 import { SharedUiModule } from '../../shared/shared-ui.module';
@@ -115,6 +115,7 @@ import { SharedUiModule } from '../../shared/shared-ui.module';
 export class LoginComponent {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private errors = inject(ErrorHandlerService);
 
   identifier = '';
@@ -131,6 +132,11 @@ export class LoginComponent {
       await this.auth.login(this.identifier.trim(), this.password, this.rememberMe);
       this.errors.showSuccess('Welcome back!', 'Login successful');
       const user = this.auth.user();
+      const returnUrl = String(this.route.snapshot.queryParams?.['returnUrl'] ?? '');
+      if (this.isSafeReturnUrl(returnUrl, user?.role)) {
+        await this.router.navigateByUrl(returnUrl);
+        return;
+      }
       if (user?.role === 'ADMIN') this.router.navigate(['/admin/dashboard']);
       else this.router.navigate(['/dashboard']);
     } catch (e: unknown) {
@@ -139,5 +145,13 @@ export class LoginComponent {
     } finally {
       this.loading = false;
     }
+  }
+
+  private isSafeReturnUrl(url: string, role?: string): boolean {
+    if (!url || !url.startsWith('/') || url.startsWith('//')) return false;
+    const blocked = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
+    if (blocked.some((p) => url === p || url.startsWith(p + '?') || url.startsWith(p + '/'))) return false;
+    if (url.startsWith('/admin') && role !== 'ADMIN') return false;
+    return true;
   }
 }
