@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { ConfirmationService } from 'primeng/api';
 import { SharedUiModule } from '../../shared/shared-ui.module';
 import { AuthService } from '../../core/services/auth.service';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
@@ -50,24 +51,27 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       <p-card *ngIf="!loading && profile" header="Personal details">
         <div class="flex align-items-center justify-content-between mb-3 px-3 py-2 border-round" style="background: #f9fafb">
           <span class="font-bold">Active donor <span class="muted text-sm font-normal">— visible in search</span></span>
-          <p-inputSwitch [(ngModel)]="profile.active" (onChange)="toggleActive()"></p-inputSwitch>
+          <p-inputSwitch [(ngModel)]="profile.active" (onChange)="askToggleActive()"></p-inputSwitch>
         </div>
+        <p-message *ngIf="isEmailChanged() || isMobileChanged()" severity="warn" text="Changing email or mobile will require re-verification." styleClass="w-full mb-3"></p-message>
         <form (ngSubmit)="save()" #f="ngForm" class="formgrid grid">
           <div class="field col-12 md:col-6">
             <label for="fn">First name</label>
-            <input pInputText id="fn" [(ngModel)]="profile.firstName" name="firstName" required class="w-full" />
+            <input pInputText id="fn" [(ngModel)]="profile.firstName" name="firstName" required maxlength="100" class="w-full" />
           </div>
           <div class="field col-12 md:col-6">
             <label for="ln">Last name</label>
-            <input pInputText id="ln" [(ngModel)]="profile.lastName" name="lastName" required class="w-full" />
+            <input pInputText id="ln" [(ngModel)]="profile.lastName" name="lastName" required maxlength="100" class="w-full" />
           </div>
           <div class="field col-12 md:col-6">
             <label for="em">Email</label>
-            <input pInputText id="em" [(ngModel)]="profile.email" name="email" type="email" required email class="w-full" />
+            <input pInputText id="em" [(ngModel)]="profile.email" name="email" type="email" required email maxlength="254" class="w-full" #emailCtrl="ngModel" />
+            <small class="p-error" *ngIf="emailCtrl.invalid && emailCtrl.touched">Enter a valid email address</small>
           </div>
           <div class="field col-12 md:col-6">
             <label for="mo">Mobile</label>
-            <input pInputText id="mo" [(ngModel)]="profile.mobile" name="mobile" required class="w-full" />
+            <input pInputText id="mo" [(ngModel)]="profile.mobile" name="mobile" required inputmode="numeric" maxlength="10" minlength="10" pattern="[0-9]{10}" class="w-full" #mobileCtrl="ngModel" (ngModelChange)="onMobileInput($event)" />
+            <small class="p-error" *ngIf="mobileCtrl.invalid && mobileCtrl.touched">Enter a valid 10-digit mobile number</small>
           </div>
           <div class="field col-12 md:col-6">
             <label for="country">Country</label>
@@ -83,22 +87,24 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           </div>
           <div class="field col-12 md:col-6">
             <label for="area">Area</label>
-            <input pInputText id="area" [(ngModel)]="profile.area" name="area" class="w-full" />
+            <input pInputText id="area" [(ngModel)]="profile.area" name="area" required maxlength="200" class="w-full" #areaCtrl="ngModel" />
+            <small class="p-error" *ngIf="areaCtrl.invalid && areaCtrl.touched">Area is required (max 200)</small>
           </div>
           <div class="field col-12 md:col-6">
             <label for="pin">Pin code</label>
-            <input pInputText id="pin" [(ngModel)]="profile.pinCode" name="pinCode" class="w-full" />
+            <input pInputText id="pin" [(ngModel)]="profile.pinCode" name="pinCode" required inputmode="numeric" maxlength="6" minlength="6" pattern="[0-9]{6}" class="w-full" #pinCtrl="ngModel" />
+            <small class="p-error" *ngIf="pinCtrl.invalid && pinCtrl.touched">Enter a valid 6-digit pin code</small>
           </div>
           <div class="col-12 flex flex-wrap gap-2">
             <p-button type="button" label="Use my location" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()"></p-button>
-            <p-button type="submit" label="Save changes" icon="pi pi-check" [loading]="saving" [disabled]="f.invalid || saving"></p-button>
+            <p-button type="submit" label="Save changes" icon="pi pi-check" [loading]="saving" [disabled]="f.invalid || !mobileValid() || !pinValid() || saving"></p-button>
           </div>
         </form>
       </p-card>
 
       <p-dialog [(visible)]="otpDialog" header="Enter verification code" [modal]="true" [style]="{ width: 'min(400px, 94vw)' }">
         <p class="mt-0">We sent a 6-digit code to <strong>{{ profile?.mobile }}</strong>. It expires in 10 minutes.</p>
-        <p-message *ngIf="devOtp" severity="info" [text]="'Dev mode — your code is ' + devOtp" styleClass="w-full mb-3"></p-message>
+        <p-message *ngIf="devOtp && isDevMode" severity="info" [text]="'Dev mode — your code is ' + devOtp" styleClass="w-full mb-3"></p-message>
         <p-message *ngIf="otpError" severity="error" [text]="otpError" styleClass="w-full mb-3"></p-message>
         <div class="field mb-0">
           <label for="otp">6-digit code</label>
@@ -109,6 +115,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <p-button label="Verify" icon="pi pi-check" (onClick)="confirmOtp()" [loading]="otpVerifying" [disabled]="otp.trim().length !== 6"></p-button>
         </div>
       </p-dialog>
+      <p-confirmDialog></p-confirmDialog>
     </div>
   `,
   styles: [
@@ -125,6 +132,7 @@ export class ProfileComponent implements OnInit {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
   private errors = inject(ErrorHandlerService);
+  private confirm = inject(ConfirmationService);
   private cdr = inject(ChangeDetectorRef);
 
   emailSending = false;
@@ -135,6 +143,8 @@ export class ProfileComponent implements OnInit {
   devOtp = '';
 
   profile: any = null;
+  private originalEmail = '';
+  private originalMobile = '';
   loading = true;
   saving = false;
   message = '';
@@ -144,6 +154,13 @@ export class ProfileComponent implements OnInit {
   states: any[] = [];
   cities: any[] = [];
 
+  get isDevMode(): boolean {
+    try {
+      const h = typeof window !== 'undefined' ? window.location.hostname : '';
+      return h === 'localhost' || h === '127.0.0.1';
+    } catch { return false; }
+  }
+
   ngOnInit() {
     this.loadProfile();
   }
@@ -152,6 +169,8 @@ export class ProfileComponent implements OnInit {
     this.http.get<any>('/api/users/me').subscribe({
       next: (r) => {
         this.profile = r.data ?? r;
+        this.originalEmail = this.profile?.email ?? '';
+        this.originalMobile = this.profile?.mobile ?? '';
         this.loading = false;
         this.loadLocationMasters();
         this.cdr.markForCheck();
@@ -164,6 +183,16 @@ export class ProfileComponent implements OnInit {
       },
     });
   }
+
+  isEmailChanged(): boolean { return this.profile && this.originalEmail && this.profile.email !== this.originalEmail; }
+  isMobileChanged(): boolean { return this.profile && this.originalMobile && String(this.profile.mobile ?? '').replace(/\D/g,'') !== String(this.originalMobile ?? '').replace(/\D/g,''); }
+
+  onMobileInput(value: string) {
+    const digits = String(value ?? '').replace(/\D/g, '').slice(0, 10);
+    if (digits !== this.profile.mobile) this.profile.mobile = digits;
+  }
+  mobileValid(): boolean { return /^[0-9]{10}$/.test(String(this.profile?.mobile ?? '')); }
+  pinValid(): boolean { return /^[0-9]{6}$/.test(String(this.profile?.pinCode ?? '').trim()); }
 
   /** Same cascading behaviour as registration: country → states → cities. */
   loadLocationMasters() {
@@ -301,6 +330,8 @@ export class ProfileComponent implements OnInit {
   }
 
   save() {
+    if (!this.mobileValid()) { this.error = 'Enter a valid 10-digit mobile number.'; this.cdr.markForCheck(); return; }
+    if (!this.pinValid()) { this.error = 'Enter a valid 6-digit pin code.'; this.cdr.markForCheck(); return; }
     this.saving = true;
     this.message = '';
     this.error = '';
@@ -308,18 +339,20 @@ export class ProfileComponent implements OnInit {
       firstName: this.profile.firstName,
       lastName: this.profile.lastName,
       email: this.profile.email,
-      mobile: this.profile.mobile,
+      mobile: String(this.profile.mobile ?? '').replace(/\D/g,'').slice(0,10),
       countryId: this.profile.countryId,
       stateId: this.profile.stateId,
       cityId: this.profile.cityId,
       area: this.profile.area,
-      pinCode: this.profile.pinCode,
+      pinCode: String(this.profile.pinCode ?? '').trim(),
       latitude: Number(this.profile.latitude),
       longitude: Number(this.profile.longitude),
     };
     this.http.patch<any>('/api/users/me', payload).subscribe({
       next: (r) => {
         this.profile = r.data ?? r;
+        this.originalEmail = this.profile?.email ?? this.originalEmail;
+        this.originalMobile = this.profile?.mobile ?? this.originalMobile;
         // Refresh dependents in case IDs changed server-side.
         this.loadLocationMasters();
         this.message = 'Profile saved.';
@@ -336,7 +369,24 @@ export class ProfileComponent implements OnInit {
     });
   }
 
-  toggleActive() {
+  askToggleActive() {
+    const willBeActive = this.profile.active;
+    const action = willBeActive ? 'make your profile visible to seekers' : 'hide your profile from search';
+    // p-inputSwitch already flipped the value — we need to confirm, revert if cancelled
+    this.confirm.confirm({
+      message: `Are you sure you want to ${action}?`,
+      header: willBeActive ? 'Activate profile' : 'Hide profile',
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonStyleClass: willBeActive ? 'p-button-success' : 'p-button-warning',
+      accept: () => this.toggleActive(),
+      reject: () => {
+        this.profile.active = !willBeActive;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  private toggleActive() {
     this.http.patch<any>('/api/users/me/status', { active: this.profile.active }).subscribe({
       next: () => {
         this.message = 'Status updated.';
