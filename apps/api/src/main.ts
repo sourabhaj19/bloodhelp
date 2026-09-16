@@ -23,6 +23,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
+  // Trust first proxy (nginx/Traefik) so req.ip and X-Forwarded-For handling in
+  // AuthController.getMeta and RateLimit guards see the real client IP.
+  const httpAdapter = app.getHttpAdapter();
+  const instance: any = httpAdapter.getInstance?.();
+  if (instance?.set) instance.set('trust proxy', 1);
+
   // Security hardening per §9 — Helmet + CORS restricted to FRONTEND_URL
   app.use(cookieParser());
   app.use(

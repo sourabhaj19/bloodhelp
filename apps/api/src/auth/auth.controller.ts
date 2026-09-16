@@ -18,6 +18,8 @@ import { VerifyEmailDto, VerifyMobileDto } from './dto/verify.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { LoginRateLimitGuard } from './guards/login-rate-limit.guard';
+import { RefreshRateLimitGuard } from './guards/refresh-rate-limit.guard';
 
 function getMeta(req: Request) {
   return {
@@ -72,6 +74,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
+  @UseGuards(LoginRateLimitGuard)
   @ApiOperation({ summary: 'Login with email or mobile' })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.login(dto, getMeta(req));
@@ -92,6 +95,7 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(200)
+  @UseGuards(RefreshRateLimitGuard)
   @ApiOperation({ summary: 'Rotate refresh token, issue new access token' })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     // Support both cookie and body token for testability; prefer cookie

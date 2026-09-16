@@ -15,12 +15,14 @@ import { AuditModule } from './audit/audit.module';
 import { GeocodingModule } from './geocoding/geocoding.module';
 import { MailModule } from './mail/mail.module';
 import { ContactModule } from './contact/contact.module';
+import { RedisModule } from './redis/redis.module';
 import appConfig from './config/app.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'], load: [appConfig] }),
     DatabaseModule,
+    RedisModule,
     HealthModule,
     AuthModule,
     UsersModule,

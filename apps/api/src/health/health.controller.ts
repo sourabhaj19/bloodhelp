@@ -1,11 +1,17 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
+import { RedisService } from '../redis/redis.service';
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Liveness probe — always 200 if process is up' })
@@ -33,30 +39,33 @@ export class HealthController {
       ready = false;
     }
 
-    // Redis check — optional in Phase 2 (not yet wired to BullMQ)
-    // If REDIS_URL is set, try a lightweight ping via direct import without failing readiness
-    // This keeps Phase 2 runnable even without Redis, but signals readiness correctly when Redis is expected.
-    if (process.env.REDIS_URL) {
+    // Redis check — uses the wired RedisService (ioredis) with in-memory fallback.
+    // When REDIS_URL is not set, we report "skipped — memory fallback active" and do NOT
+    // flip readiness to false (API is still functional, throttling is per-instance).
+    // When REDIS_URL is set, we expect Redis to be reachable; a ping failure marks not_ready.
+    const redisUrl = this.config.get<string>('app.redisUrl') || process.env.REDIS_URL || '';
+    if (redisUrl) {
       try {
-        // Lazy import to avoid hard dependency if ioredis not yet installed
-        const { default: IORedis } = await import('ioredis');
-        const redis = new IORedis(process.env.REDIS_URL!, {
-          lazyConnect: true,
-          maxRetriesPerRequest: 1,
-          enableReadyCheck: false,
-        });
-        await redis.connect();
-        const pong = await redis.ping();
-        checks.redis = pong === 'PONG' ? 'ok' : 'error';
-        await redis.quit();
-        if (checks.redis !== 'ok') ready = false;
+        const pong = await this.redis.ping();
+        if (pong === 'ok') {
+          checks.redis = 'ok';
+        } else if (pong === 'skipped') {
+          checks.redis = 'skipped';
+        } else {
+          checks.redis = 'error';
+          ready = false;
+        }
+        // Extra: report mode
+        checks.redisMode = this.redis.isRedisAvailable() ? 'redis' : 'memory-fallback';
+        if (checks.redis === 'error') ready = false;
       } catch {
         checks.redis = 'error';
-        // In Phase 2 Redis is not strictly required for liveness, but readiness should reflect it
+        checks.redisMode = 'error';
         ready = false;
       }
     } else {
-      checks.redis = 'skipped (REDIS_URL not set)';
+      checks.redis = 'skipped (REDIS_URL not set — memory fallback active)';
+      checks.redisMode = this.redis.isRedisAvailable() ? 'redis' : 'memory';
     }
 
     const status = ready ? 200 : 503;

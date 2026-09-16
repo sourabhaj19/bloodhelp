@@ -4,7 +4,32 @@ export default registerAs('app', () => ({
   port: parseInt(process.env.PORT || '3000', 10),
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4200',
   databaseUrl: process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bloodhelp',
-  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  redisUrl: process.env.REDIS_URL || '',
+  rateLimit: {
+    // Global toggle — set RATE_LIMIT_ENABLED=false to disable all throttling (not recommended in prod)
+    enabled: process.env.RATE_LIMIT_ENABLED !== 'false',
+    login: {
+      // Per-IP window: 15 min, 10 attempts. Catches brute-force from single IP across many identifiers.
+      ip: {
+        windowMs: parseInt(process.env.RATE_LIMIT_LOGIN_IP_WINDOW_MS || '900000', 10),
+        max: parseInt(process.env.RATE_LIMIT_LOGIN_IP_MAX || '10', 10),
+      },
+      // Per-identifier window: 15 min, 5 attempts. Catches targeted brute-force on one account,
+      // even when attacker rotates IPs. Identifier is normalized (email lower-cased, mobile trimmed).
+      identifier: {
+        windowMs: parseInt(process.env.RATE_LIMIT_LOGIN_IDENTIFIER_WINDOW_MS || '900000', 10),
+        max: parseInt(process.env.RATE_LIMIT_LOGIN_IDENTIFIER_MAX || '5', 10),
+      },
+    },
+    refresh: {
+      // Per-IP for refresh: 15 min, 30 attempts. Refresh is legitimate but frequent; 30/15m
+      // is generous for NAT/CGNAT (many users behind one IP) while still blocking token-guessing floods.
+      ip: {
+        windowMs: parseInt(process.env.RATE_LIMIT_REFRESH_IP_WINDOW_MS || '900000', 10),
+        max: parseInt(process.env.RATE_LIMIT_REFRESH_IP_MAX || '30', 10),
+      },
+    },
+  },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'replace-with-at-least-32-random-bytes-access',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'replace-with-at-least-32-random-bytes-refresh',
