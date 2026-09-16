@@ -87,7 +87,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             </td>
             <td>
               <div class="flex gap-2">
-                <p-button label="Thank" icon="pi pi-heart" size="small" severity="secondary" [outlined]="true" (onClick)="thank(d)"></p-button>
+                <p-button [label]="thankedIds.has(d.id) ? 'Thanked' : 'Thank'" icon="pi pi-heart" size="small" [severity]="thankedIds.has(d.id) ? 'success' : 'secondary'" [outlined]="!thankedIds.has(d.id)" [disabled]="thankedIds.has(d.id)" (onClick)="openThank(d)" [pTooltip]="thankedIds.has(d.id) ? 'You already thanked this donor' : 'Send thanks'"></p-button>
                 <p-button *ngIf="d.id !== myId" icon="pi pi-flag" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" pTooltip="Report user"></p-button>
               </div>
             </td>
@@ -111,7 +111,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <div class="text-sm mb-2"><span *ngIf="d.approxDistanceKm != null" class="font-bold" style="color:#b42318">~{{ d.approxDistanceKm }} km away</span><span *ngIf="d.approxDistanceKm == null" class="muted">Distance — enable “Near me”</span></div>
           <div class="flex gap-2 flex-wrap">
             <p-button *ngIf="d.latitude && d.longitude" label="View on map" icon="pi pi-map-marker" size="small" severity="secondary" [outlined]="true" (onClick)="focusOnMap(d)" styleClass="mobile-action"></p-button>
-            <p-button label="Thank" icon="pi pi-heart" size="small" severity="secondary" [outlined]="true" (onClick)="thank(d)" styleClass="mobile-action"></p-button>
+            <p-button [label]="thankedIds.has(d.id) ? 'Thanked' : 'Thank'" icon="pi pi-heart" size="small" [severity]="thankedIds.has(d.id) ? 'success' : 'secondary'" [outlined]="!thankedIds.has(d.id)" [disabled]="thankedIds.has(d.id)" (onClick)="openThank(d)" styleClass="mobile-action"></p-button>
             <p-button *ngIf="d.id !== myId" icon="pi pi-flag" label="Report" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" styleClass="mobile-action"></p-button>
           </div>
         </div>
@@ -126,8 +126,8 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       </p-paginator>
     </p-card>
 
-    <p-dialog [(visible)]="mapDialog" [modal]="true" [dismissableMask]="true" [draggable]="false"
-      [style]="{ width: 'min(900px, 96vw)' }" [header]="mapDialogTitle"
+    <p-dialog [(visible)]="mapDialog" [modal]="true" [dismissableMask]="true" [draggable]="false" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false"
+      [style]="{ width: 'min(900px, 96vw)' }" [header]="mapDialogTitle" [contentStyle]="{'overflow':'auto'}" styleClass="centered-dialog"
       (onShow)="onMapDialogShow()" (onHide)="onMapDialogHide()">
       <app-donor-map *ngIf="mapDialog"
         [donors]="mapDialogDonors"
@@ -143,7 +143,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       </div>
     </p-dialog>
 
-    <p-dialog [(visible)]="reportDialog" header="Report user" [modal]="true" [style]="{ width: 'min(460px, 94vw)' }">
+    <p-dialog [(visible)]="reportDialog" header="Report user" [modal]="true" [dismissableMask]="true" [draggable]="false" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false" [style]="{ width: 'min(460px, 94vw)' }" [contentStyle]="{'overflow':'auto'}" styleClass="centered-dialog">
       <p class="mt-0">Reporting <strong>{{ reportTarget?.displayName || reportTarget?.fullName }}</strong>. Reports are reviewed by admins; false reports may affect your account.</p>
       <div class="flex flex-column gap-3">
         <div class="field mb-0">
@@ -158,6 +158,20 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       <ng-template pTemplate="footer">
         <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="reportDialog = false"></p-button>
         <p-button label="Submit report" icon="pi pi-flag" severity="danger" (onClick)="submitReport()" [loading]="reporting" [disabled]="!report.reasonId"></p-button>
+      </ng-template>
+    </p-dialog>
+
+    <p-dialog [(visible)]="thankDialog" header="Send thanks" [modal]="true" [dismissableMask]="true" [draggable]="false" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false" [style]="{ width: 'min(460px, 94vw)' }" [contentStyle]="{'overflow':'auto'}" styleClass="centered-dialog">
+      <p class="mt-0">Send thanks to <strong>{{ thankTarget?.displayName || thankTarget?.fullName }}</strong> for being a donor.</p>
+      <div class="field mb-0">
+        <label for="thankMsg">Message (optional)</label>
+        <textarea pInputTextarea id="thankMsg" [(ngModel)]="thankMessage" rows="4" maxlength="500" class="w-full" placeholder="Thank you for being a donor!"></textarea>
+        <small class="muted">{{ thankMessage.length }}/500</small>
+      </div>
+      <small class="muted block mt-2">You can thank the same donor once per 24 hours.</small>
+      <ng-template pTemplate="footer">
+        <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="thankDialog = false"></p-button>
+        <p-button label="Send thanks" icon="pi pi-heart" (onClick)="submitThank()" [loading]="thanking"></p-button>
       </ng-template>
     </p-dialog>
 
@@ -216,6 +230,11 @@ export class DonorsComponent implements OnInit, OnDestroy {
   reporting = false;
   reportTarget: any = null;
   report: any = { reasonId: '', description: '' };
+  thankDialog = false;
+  thanking = false;
+  thankTarget: any = null;
+  thankMessage = 'Thank you for being a donor!';
+  thankedIds = new Set<string>();
   filters: any = { bloodGroupId: '', countryId: '', stateId: '', cityId: '', area: '', radiusKm: '', lat: null, lng: null, page: 1, pageSize: 20 };
   private defaultCountryId = '';
   private searchSubject = new Subject<void>();
@@ -543,17 +562,40 @@ export class DonorsComponent implements OnInit, OnDestroy {
     this.search();
   }
 
-  async thank(donor: any) {
+  openThank(donor: any) {
+    if (this.thankedIds.has(donor.id)) return;
+    this.thankTarget = donor;
+    this.thankMessage = 'Thank you for being a donor!';
+    this.thankDialog = true;
+    this.cdr.markForCheck();
+  }
+
+  async submitThank() {
+    if (!this.thankTarget || this.thanking) return;
+    this.thanking = true;
     try {
+      const msg = String(this.thankMessage ?? '').trim() || 'Thank you for being a donor!';
       await firstValueFrom(
         this.http.post<any>('/api/appreciations', {
-          receiverUserId: donor.id,
-          message: 'Thank you for being a donor!',
+          receiverUserId: this.thankTarget.id,
+          message: msg.slice(0, 500),
         }),
       );
-      this.errors.showSuccess(`Thanks sent to ${donor.displayName || donor.fullName || 'donor'}.`);
-    } catch (e) {
-      this.errors.handleHttpError(e as any, 'Failed to send thanks');
+      this.thankedIds.add(String(this.thankTarget.id));
+      this.errors.showSuccess(`Thanks sent to ${this.thankTarget.displayName || this.thankTarget.fullName || 'donor'}.`);
+      this.thankDialog = false;
+    } catch (e: any) {
+      const msg = this.errors.getUserMessage(e);
+      if (String(msg).toLowerCase().includes('already') || String(e?.error?.code).includes('DUPLICATE')) {
+        this.errors.showWarn('You already thanked this donor in the last 24 hours.');
+        if (this.thankTarget) this.thankedIds.add(String(this.thankTarget.id));
+        this.thankDialog = false;
+      } else {
+        this.errors.handleHttpError(e, 'Failed to send thanks');
+      }
+    } finally {
+      this.thanking = false;
+      this.cdr.markForCheck();
     }
   }
 

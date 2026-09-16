@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { SharedUiModule } from '../../shared/shared-ui.module';
 import { ErrorHandlerService } from '../../core/services/error-handler.service';
 
 @Component({
   standalone: true,
-  imports: [SharedUiModule],
+  imports: [RouterLink, SharedUiModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1 class="page-title">Appreciations</h1>
@@ -27,7 +28,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
               </div>
             </div>
           </p-card>
-          <p-card *ngIf="!received.length"><p class="text-center muted">No thanks received yet.</p></p-card>
+          <p-card *ngIf="!received.length"><p class="text-center muted">No thanks received yet — when someone thanks you, it will appear here.</p></p-card>
           <p-paginator *ngIf="received.length > pageSizeR" [rows]="pageSizeR" [totalRecords]="received.length" [rowsPerPageOptions]="[5, 10, 20]" [first]="(pageR - 1) * pageSizeR" (onPageChange)="onPageR($event)" styleClass="mt-1"></p-paginator>
         </div>
       </p-tabPanel>
@@ -44,7 +45,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
               </div>
             </div>
           </p-card>
-          <p-card *ngIf="!given.length"><p class="text-center muted">You haven't thanked anyone yet. Find a donor to thank them.</p></p-card>
+          <p-card *ngIf="!given.length"><div class="text-center"><p class="muted">You haven't thanked anyone yet.</p><p-button label="Find donors to thank" icon="pi pi-search" routerLink="/donors" size="small" styleClass="mt-2"></p-button></div></p-card>
           <p-paginator *ngIf="given.length > pageSizeG" [rows]="pageSizeG" [totalRecords]="given.length" [rowsPerPageOptions]="[5, 10, 20]" [first]="(pageG - 1) * pageSizeG" (onPageChange)="onPageG($event)" styleClass="mt-1"></p-paginator>
         </div>
       </p-tabPanel>
