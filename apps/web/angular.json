@@ -33,6 +33,23 @@
             "development": { "buildTarget": "web:build" }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "tsConfig": "tsconfig.json",
+            "polyfills": ["zone.js", "zone.js/testing"],
+            "karmaConfig": "karma.conf.js",
+            "assets": [{ "glob": "**/*", "input": "public", "output": "/" }],
+            "styles": [
+              "node_modules/primeng/resources/themes/lara-light-blue/theme.css",
+              "node_modules/primeng/resources/primeng.css",
+              "node_modules/primeicons/primeicons.css",
+              "node_modules/primeflex/primeflex.css",
+              "src/styles.css"
+            ],
+            "scripts": []
+          }
         }
       }
     }

@@ -9,6 +9,9 @@
     "isolatedModules": true,
     "experimentalDecorators": true,
     "importHelpers": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["jest", "node"],
     "lib": ["ES2022", "dom"]
   },
   "angularCompilerOptions": { "strictTemplates": true }
