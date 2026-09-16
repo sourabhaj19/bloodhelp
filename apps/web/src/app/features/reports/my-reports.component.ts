@@ -39,7 +39,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       </p-table>
     </p-card>
 
-    <p-dialog [(visible)]="dialog" header="Report brief" [modal]="true" [style]="{ width: 'min(480px, 94vw)' }">
+    <p-dialog [(visible)]="dialog" header="Report brief" [modal]="true" [style]="{ width: 'min(520px, 96vw)' }">
       <div *ngIf="selected" class="flex flex-column gap-3">
         <div class="flex align-items-center justify-content-between">
           <p-tag [value]="pretty(selected.status)" [severity]="statusSeverity(selected.status)"></p-tag>
@@ -57,7 +57,16 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <div class="muted text-sm">Your description</div>
           <p class="mt-1 mb-0">{{ selected.description }}</p>
         </div>
-        <p-message severity="info" text="An admin will review this report. You'll get a notification when its status changes." styleClass="w-full"></p-message>
+        <div *ngIf="selected.adminComment">
+          <div class="muted text-sm">Admin response</div>
+          <p class="mt-1 mb-0" style="background:#f9fafb; border:1px solid #eaecf0; border-radius:8px; padding:10px;">{{ selected.adminComment }}</p>
+          <small class="muted" *ngIf="selected.updatedAt">Updated {{ selected.updatedAt | date:'medium' }}</small>
+        </div>
+        <div *ngIf="!selected.adminComment">
+          <div class="muted text-sm">Admin response</div>
+          <p class="muted text-sm mt-1 mb-0" *ngIf="selected.status === 'OPEN'">No response yet — an admin will review this report. You'll get a notification when its status changes.</p>
+          <p class="muted text-sm mt-1 mb-0" *ngIf="selected.status !== 'OPEN'">No admin comment provided.</p>
+        </div>
       </div>
       <ng-template pTemplate="footer">
         <p-button label="Close" (onClick)="dialog = false"></p-button>
@@ -128,11 +137,12 @@ export class MyReportsComponent implements OnInit {
     return s === 'UNDER_REVIEW' ? 'Under review' : s.charAt(0) + s.slice(1).toLowerCase();
   }
 
-  statusSeverity(s: string): 'danger' | 'warning' | 'success' | 'info' {
+  statusSeverity(s: string): 'danger' | 'warning' | 'success' | 'info' | 'secondary' {
     switch (s) {
       case 'OPEN': return 'danger';
       case 'UNDER_REVIEW': return 'warning';
       case 'RESOLVED': return 'success';
+      case 'REJECTED': return 'danger';
       default: return 'info';
     }
   }

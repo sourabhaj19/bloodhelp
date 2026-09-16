@@ -80,7 +80,7 @@ export class ReportsService {
     });
   }
 
-  /** Reports filed BY a user — brief view, adminComment stays internal. */
+  /** Reports filed BY a user — includes adminComment so reporter sees reasoning. */
   async listMine(reporterId: string) {
     return this.prisma.userReport.findMany({
       where: { reportedByUserId: reporterId },
@@ -88,6 +88,7 @@ export class ReportsService {
         id: true,
         status: true,
         description: true,
+        adminComment: true,
         createdAt: true,
         updatedAt: true,
         reason: { select: { id: true, code: true, label: true } },
@@ -104,6 +105,7 @@ export class ReportsService {
         id: true,
         status: true,
         description: true,
+        adminComment: true,
         createdAt: true,
         updatedAt: true,
         reportedByUserId: true,
