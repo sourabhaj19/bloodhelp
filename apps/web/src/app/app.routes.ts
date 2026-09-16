@@ -203,6 +203,11 @@ export const routes: Routes = [
             (m) => m.EmailTemplatesComponent,
           ),
       },
+      {
+        path: 'audit-logs',
+        loadComponent: () =>
+          import('./features/admin/audit/audit-logs.component').then((m) => m.AuditLogsComponent),
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },
