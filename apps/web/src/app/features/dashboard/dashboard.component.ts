@@ -34,8 +34,8 @@ interface DashboardData {
       </div>
     </div>
 
-    <div *ngIf="needsVerification()" class="verify-banner mb-3">
-      <i class="pi pi-exclamation-triangle"></i>
+    <div *ngIf="needsVerification()" class="verify-banner mb-3" role="status" aria-live="polite">
+      <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
       <span>{{ verificationHint() }}</span>
       <a routerLink="/profile" class="link">Verify now</a>
     </div>
@@ -79,7 +79,7 @@ interface DashboardData {
         </p-card>
       </div>
       <div class="col-12 sm:col-6 lg:col-3">
-        <p-card styleClass="stat clickable" (click)="go('/notifications')">
+        <p-card styleClass="stat clickable" role="button" tabindex="0" aria-label="View notifications" (click)="go('/notifications')" (keydown.enter)="go('/notifications')" (keydown.space)="go('/notifications'); $event.preventDefault()">
           <div class="flex align-items-center justify-content-between">
             <span class="stat-label">Notifications</span>
             <span class="stat-icon amber"><i class="pi pi-bell"></i></span>

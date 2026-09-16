@@ -66,10 +66,11 @@ export class ForgotPasswordComponent {
     try {
       const res: any = await this.auth.forgotPassword(this.email.trim());
       this.message = res.message ?? 'If an account exists, a reset link has been sent.';
-      if (res.data?.devToken) this.message += ' (dev token: ' + res.data.devToken + ')';
+      const isDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isDev && res.data?.devToken) this.message += ' (dev token: ' + res.data.devToken + ')';
     } catch (e: any) {
       this.error = this.errors.getUserMessage(e);
-      this.errors.handleHttpError(e, 'Failed to send reset link');
+      // banner only — no duplicate toast
     } finally {
       this.loading = false;
     }

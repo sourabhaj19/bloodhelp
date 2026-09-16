@@ -86,7 +86,7 @@ export class ResetPasswordComponent {
       setTimeout(() => this.router.navigate(['/login']), 1200);
     } catch (e: any) {
       this.error = this.errors.getUserMessage(e);
-      this.errors.handleHttpError(e, 'Reset failed');
+      // banner only — no duplicate toast
     } finally {
       this.loading = false;
     }

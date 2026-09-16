@@ -27,7 +27,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
     <div *ngIf="!loading" class="flex flex-column gap-2">
       <p-card *ngFor="let n of items" [styleClass]="(n.isRead ? 'read' : 'unread') + (hasReport(n) ? ' clickable' : '')">
         <div class="flex align-items-start justify-content-between gap-2">
-          <div [class.linkable]="hasReport(n)" (click)="openLinked(n)" [style.cursor]="hasReport(n) ? 'pointer' : 'default'">
+          <div [class.linkable]="hasReport(n)" (click)="openLinked(n)" (keydown.enter)="openLinked(n)" (keydown.space)="openLinked(n); $event.preventDefault()" [attr.role]="hasReport(n) ? 'button' : null" [attr.tabindex]="hasReport(n) ? '0' : null" [attr.aria-label]="hasReport(n) ? 'View report ' + n.title : null" [style.cursor]="hasReport(n) ? 'pointer' : 'default'">
             <div class="flex align-items-center gap-2">
               <strong>{{ n.title }}</strong>
               <p-tag *ngIf="!n.isRead" value="New" severity="danger"></p-tag>
@@ -36,7 +36,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             <div class="muted text-sm">{{ n.createdAt | date: 'medium' }}</div>
             <p class="mt-2 mb-0">{{ n.message }}</p>
           </div>
-          <p-button *ngIf="!n.isRead" label="Mark read" size="small" severity="secondary" [outlined]="true" (onClick)="mark(n)"></p-button>
+          <p-button *ngIf="!n.isRead" label="Mark read" size="small" severity="secondary" [outlined]="true" (onClick)="mark(n); $event.stopPropagation()"></p-button>
         </div>
       </p-card>
       <p-card *ngIf="!items.length">

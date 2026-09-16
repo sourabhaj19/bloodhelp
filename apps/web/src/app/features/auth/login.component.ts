@@ -141,7 +141,7 @@ export class LoginComponent {
       else this.router.navigate(['/dashboard']);
     } catch (e: unknown) {
       this.error = this.errors.getUserMessage(e);
-      this.errors.handleHttpError(e as any, 'Login failed');
+      // banner only — no duplicate toast (was handleHttpError)
     } finally {
       this.loading = false;
     }

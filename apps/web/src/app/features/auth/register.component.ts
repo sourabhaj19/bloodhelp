@@ -783,7 +783,7 @@ export class RegisterComponent implements OnInit {
       }, 600);
     } catch (e: any) {
       this.error = this.errors.getUserMessage(e);
-      this.errors.handleHttpError(e, 'Registration failed');
+      // banner only — no duplicate toast
     } finally {
       this.loading = false;
     }
