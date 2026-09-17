@@ -14,8 +14,8 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
     <p class="page-sub">Manage donor and admin accounts.</p>
 
     <p-card styleClass="mb-3">
-      <div class="flex gap-2">
-        <p-iconField iconPosition="left" styleClass="w-full">
+      <div class="flex gap-2 flex-wrap align-items-center toolbar">
+        <p-iconField iconPosition="left" styleClass="search-field">
           <p-inputIcon styleClass="pi pi-search"></p-inputIcon>
           <input pInputText [(ngModel)]="search" placeholder="Search email / name / mobile" class="w-full" (keyup.enter)="onSearch()" />
         </p-iconField>
@@ -34,7 +34,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
       <div class="desktop-table">
       <p-table [value]="result.items ?? []" styleClass="p-datatable-sm" responsiveLayout="scroll">
         <ng-template pTemplate="header">
-          <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Map</th><th style="width: 220px">Actions</th></tr>
+          <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Map</th><th style="width: 330px">Actions</th></tr>
         </ng-template>
         <ng-template pTemplate="body" let-u>
           <tr>
@@ -55,7 +55,8 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
               <span *ngIf="u.latitude == null || u.longitude == null" class="muted text-sm">—</span>
             </td>
             <td>
-              <div class="flex gap-2">
+              <div class="flex gap-2 desktop-actions">
+                <p-button label="View" icon="pi pi-eye" size="small" severity="secondary" [outlined]="true" (onClick)="openView(u)"></p-button>
                 <p-button [label]="u.active ? 'Deactivate' : 'Activate'" size="small" severity="secondary" [outlined]="true" (onClick)="toggle(u)"></p-button>
                 <p-button label="Delete" size="small" severity="danger" (onClick)="askRemove(u)"></p-button>
               </div>
@@ -76,10 +77,11 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
           </div>
           <div class="text-sm muted mb-1" style="word-break:break-all">{{ u.email }}</div>
           <div class="mb-2"><p-tag [value]="u.active ? 'Active' : 'Inactive'" [severity]="u.active ? 'success' : 'warning'"></p-tag></div>
-          <div class="flex gap-2 flex-wrap">
-            <p-button *ngIf="u.latitude != null && u.longitude != null" label="View on map" icon="pi pi-map-marker" size="small" severity="secondary" [outlined]="true" (onClick)="focusOnMap(u)" styleClass="mobile-action"></p-button>
-            <p-button [label]="u.active ? 'Deactivate' : 'Activate'" size="small" severity="secondary" [outlined]="true" (onClick)="toggle(u)" styleClass="mobile-action"></p-button>
-            <p-button label="Delete" size="small" severity="danger" (onClick)="askRemove(u)" styleClass="mobile-action"></p-button>
+          <div class="card-actions">
+            <p-button *ngIf="u.latitude != null && u.longitude != null" icon="pi pi-map-marker" size="small" severity="secondary" [outlined]="true" (onClick)="focusOnMap(u)" pTooltip="View on map" tooltipPosition="bottom" styleClass="mobile-action"></p-button>
+            <p-button icon="pi pi-eye" size="small" severity="secondary" [outlined]="true" (onClick)="openView(u)" pTooltip="View details" tooltipPosition="bottom" styleClass="mobile-action"></p-button>
+            <p-button [icon]="u.active ? 'pi pi-ban' : 'pi pi-check'" size="small" severity="secondary" [outlined]="true" (onClick)="toggle(u)" [pTooltip]="u.active ? 'Deactivate' : 'Activate'" tooltipPosition="bottom" styleClass="mobile-action"></p-button>
+            <p-button icon="pi pi-trash" size="small" severity="danger" (onClick)="askRemove(u)" pTooltip="Delete" tooltipPosition="bottom" styleClass="mobile-action"></p-button>
           </div>
         </div>
       </div>
@@ -109,6 +111,37 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
         <p-button *ngIf="mapDialogMode === 'single'" label="Show all pins" icon="pi pi-map" size="small" severity="secondary" [outlined]="true" (onClick)="dialogShowAll()"></p-button>
       </div>
     </p-dialog>
+
+    <p-dialog [(visible)]="viewDialog" header="User details" [modal]="true" [dismissableMask]="true" [draggable]="false"
+      [closable]="true" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false"
+      [style]="{ width: 'min(640px, 96vw)' }" [contentStyle]="{'overflow':'auto'}" (onHide)="viewUser = null">
+      <div *ngIf="viewLoading" class="flex flex-column gap-2">
+        <p-skeleton height="2.5rem" *ngFor="let i of [1, 2, 3]"></p-skeleton>
+      </div>
+      <div *ngIf="!viewLoading && viewUser" class="view-grid">
+        <div class="col-span"><div class="lbl">User ID</div><div class="mono">{{ viewUser.id }}</div></div>
+        <div><div class="lbl">Name</div><strong>{{ viewUser.firstName }} {{ viewUser.lastName }}</strong></div>
+        <div><div class="lbl">Role</div><p-tag [value]="viewUser.role" [severity]="viewUser.role === 'ADMIN' ? 'danger' : 'info'"></p-tag></div>
+        <div><div class="lbl">Email</div><span style="word-break:break-all">{{ viewUser.email }}</span>
+          <p-tag [value]="viewUser.emailVerified ? 'Verified' : 'Unverified'" [severity]="viewUser.emailVerified ? 'success' : 'warning'" styleClass="ml-2"></p-tag></div>
+        <div><div class="lbl">Mobile</div>{{ (viewUser.countryCode?.dialCode ? viewUser.countryCode.dialCode + ' ' : '') + (viewUser.mobile || '—') }}
+          <p-tag [value]="viewUser.mobileVerified ? 'Verified' : 'Unverified'" [severity]="viewUser.mobileVerified ? 'success' : 'warning'" styleClass="ml-2"></p-tag></div>
+        <div><div class="lbl">Status</div><p-tag [value]="viewUser.active ? 'Active' : 'Inactive'" [severity]="viewUser.active ? 'success' : 'warning'"></p-tag></div>
+        <div><div class="lbl">Blood group</div>{{ viewUser.bloodGroup?.code ?? viewUser.bloodGroup ?? '—' }}</div>
+        <div><div class="lbl">Country</div>{{ viewUser.country?.name ?? '—' }}</div>
+        <div><div class="lbl">State</div>{{ viewUser.state?.name ?? '—' }}</div>
+        <div><div class="lbl">City</div>{{ viewUser.city?.name ?? '—' }}</div>
+        <div><div class="lbl">Area</div>{{ viewUser.area || '—' }}</div>
+        <div><div class="lbl">PIN code</div>{{ viewUser.pinCode || '—' }}</div>
+        <div><div class="lbl">Location</div>{{ viewUser.latitude != null && viewUser.longitude != null ? viewUser.latitude + ', ' + viewUser.longitude : '—' }}</div>
+        <div><div class="lbl">Date of birth</div>{{ (viewUser.dateOfBirth | date:'mediumDate') || '—' }}</div>
+        <div><div class="lbl">Registered</div>{{ (viewUser.createdAt | date:'medium') || '—' }}</div>
+        <div><div class="lbl">Last updated</div>{{ (viewUser.updatedAt | date:'medium') || '—' }}</div>
+      </div>
+      <ng-template pTemplate="footer">
+        <p-button label="Close" severity="secondary" [text]="true" (onClick)="viewDialog = false"></p-button>
+      </ng-template>
+    </p-dialog>
   `,
   styles: [
     `
@@ -125,6 +158,16 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
         margin-bottom: 12px;
       }
       :host ::ng-deep .mobile-action { min-height: 44px; }
+      .toolbar .search-field { flex: 1 1 220px; min-width: 0; }
+      :host ::ng-deep .toolbar .p-button { white-space: nowrap; flex-shrink: 0; }
+      .card-actions { display: flex; flex-wrap: nowrap; gap: 8px; }
+      .card-actions p-button { flex: 0 0 auto; display: inline-flex; min-width: 0; }
+      :host ::ng-deep .card-actions .p-button { justify-content: center; }
+      .desktop-actions { flex-wrap: nowrap; }
+      .view-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 20px; }
+      .view-grid .col-span { grid-column: 1 / -1; }
+      .view-grid .lbl { font-size: 0.75rem; color: #98a2b3; margin-bottom: 2px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; word-break: break-all; }
       @media (max-width: 767px) {
         .desktop-table { display: none; }
         .mobile-cards { display: block; }
@@ -155,6 +198,31 @@ export class AdminUsersComponent implements OnInit {
   // would retrigger the map's ngOnChanges endlessly.
   mapDialogDonors: any[] = [];
   focusedUserId: string | null = null;
+
+  // ── User details dialog — row data shows instantly, refreshed from GET /:id ──
+  viewDialog = false;
+  viewUser: any = null;
+  viewLoading = false;
+
+  openView(u: any) {
+    this.viewUser = u;
+    this.viewLoading = true;
+    this.viewDialog = true;
+    this.cdr.markForCheck();
+    this.http.get<any>(`/api/admin/users/${u.id}`).subscribe({
+      next: (r) => {
+        this.viewUser = r.data ?? r;
+        this.viewLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: (e) => {
+        this.viewLoading = false;
+        this.viewDialog = false;
+        this.errors.handleHttpError(e, 'Failed to load user');
+        this.cdr.markForCheck();
+      },
+    });
+  }
 
   /** Admin DTO carries relation objects — flatten to the pin shape the map uses. */
   private toMapDonor(u: any): any {
