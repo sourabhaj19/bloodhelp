@@ -493,7 +493,6 @@ export class DonorsComponent implements OnInit, OnDestroy {
       },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Search failed');
         this.loading = false;
         this.cdr.markForCheck();
       },

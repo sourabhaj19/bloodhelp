@@ -280,7 +280,6 @@ export class AdminUsersComponent implements OnInit {
       },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Failed to load users');
         this.loading = false;
         this.cdr.markForCheck();
       },

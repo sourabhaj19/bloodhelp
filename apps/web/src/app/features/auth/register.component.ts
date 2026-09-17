@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, OnInit, ViewChild, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -42,11 +42,16 @@ declare const L: any;
                 name="dateOfBirth"
                 dateFormat="yy-mm-dd"
                 [showIcon]="true"
+                [minDate]="minDob"
                 [maxDate]="maxDob"
-                placeholder="1995-06-15"
+                placeholder="Select your DOB"
                 styleClass="dob-calendar"
                 required
+                #dobCtrl="ngModel"
               ></p-calendar>
+              <small class="hint">Age must be 18–65 years</small>
+              <small class="p-error" *ngIf="dobCtrl.invalid && dobCtrl.touched">Select your date of birth</small>
+              <small class="p-error" *ngIf="dob && !isDobValid()">Age must be 18–65 years to donate</small>
             </div>
             <div class="field col-12 md:col-6">
               <label for="bloodGroup">Blood group</label>
@@ -361,8 +366,9 @@ export class RegisterComponent implements OnInit {
   loading = false;
   error = '';
   success = false;
-  dob: Date | null = new Date('1995-06-15');
-  maxDob = new Date();
+  dob: Date | null = null;
+  maxDob: Date = new Date();
+  minDob: Date = new Date();
 
   // Location consent state — lat/long are mandatory, captured via GPS or map picker.
   locationDialog = false;
@@ -393,7 +399,49 @@ export class RegisterComponent implements OnInit {
   };
 
   ngOnInit() {
+    this.computeDobBounds();
     this.loadMaster();
+  }
+
+  private computeDobBounds() {
+    const today = new Date();
+    // must be at least 18 years old → max DOB = today - 18y
+    // must be at most 65 years old → min DOB = today - 65y
+    this.maxDob = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+    this.minDob = new Date(today.getFullYear() - 65, today.getMonth(), today.getDate());
+  }
+
+  private getAge(d: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return age;
+  }
+
+  isDobValid(): boolean {
+    if (!this.dob) return false;
+    const age = this.getAge(this.dob);
+    return age >= 18 && age <= 65;
+  }
+
+  get isDirty(): boolean {
+    if (this.success) return false;
+    const f = this.form;
+    return !!(f.firstName?.trim() || f.lastName?.trim() || f.email?.trim() || f.mobile?.trim() || f.area?.trim() || f.pinCode?.trim() || this.dob || f.bloodGroupId);
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(e: BeforeUnloadEvent) {
+    if (this.isDirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  }
+
+  canDeactivate(): boolean {
+    if (!this.isDirty) return true;
+    return confirm('You have unsaved changes — leave this page?');
   }
 
   /** Dial code derived from the selected country — no manual input needed. */
@@ -426,20 +474,30 @@ export class RegisterComponent implements OnInit {
       }));
       this.countryCodes = cc.data ?? cc;
       this.countries = co.data ?? co;
-      // Single-country setup (e.g. India-only): preselect so the dial code
-      // prefix shows immediately without any extra input.
-      if (this.countries.length === 1 && !this.form.countryId) {
-        this.form.countryId = this.countries[0].id;
+      // Default to India (or single country) so dial code + states load immediately.
+      if (!this.form.countryId) {
+        const india = (this.countries ?? []).find(
+          (c: any) => c.isoCode2 === 'IN' || String(c.name ?? '').toLowerCase() === 'india',
+        );
+        if (india) {
+          this.form.countryId = india.id;
+          this.resolveCountryCodeId();
+          await this.onCountryChange();
+        } else if (this.countries.length === 1) {
+          this.form.countryId = this.countries[0].id;
+          this.resolveCountryCodeId();
+          await this.onCountryChange();
+        } else if (this.countryCodes.length === 1) {
+          this.form.countryCodeId = this.countryCodes[0].id;
+        }
+      } else {
         this.resolveCountryCodeId();
-        await this.onCountryChange();
-      } else if (this.form.countryId) {
-        this.resolveCountryCodeId();
-      } else if (this.countryCodes.length === 1) {
-        this.form.countryCodeId = this.countryCodes[0].id;
       }
+      this.cdr.markForCheck();
     } catch (e) {
       this.error = this.errors.getUserMessage(e);
-      this.errors.handleHttpError(e as any, 'Failed to load form data');
+      // banner only — no duplicate toast
+      this.cdr.markForCheck();
     }
   }
 
@@ -459,12 +517,14 @@ export class RegisterComponent implements OnInit {
     this.cities = [];
     this.form.stateId = '';
     this.form.cityId = '';
+    this.cdr.markForCheck();
     if (!this.form.countryId) return;
     try {
       const r = await firstValueFrom(
         this.http.get<any>(`/api/master/countries/${this.form.countryId}/states`),
       );
       this.states = r.data ?? r;
+      this.cdr.markForCheck();
     } catch (e) {
       this.errors.handleHttpError(e as any, 'Failed to load states');
     }
@@ -473,12 +533,14 @@ export class RegisterComponent implements OnInit {
   async onStateChange() {
     this.cities = [];
     this.form.cityId = '';
+    this.cdr.markForCheck();
     if (!this.form.stateId) return;
     try {
       const r = await firstValueFrom(
         this.http.get<any>(`/api/master/states/${this.form.stateId}/cities`),
       );
       this.cities = r.data ?? r;
+      this.cdr.markForCheck();
     } catch (e) {
       this.errors.handleHttpError(e as any, 'Failed to load cities');
     }
@@ -505,6 +567,10 @@ export class RegisterComponent implements OnInit {
     }
     if (!this.dob) {
       fail('Please select your date of birth.');
+      return;
+    }
+    if (!this.isDobValid()) {
+      fail('Age must be 18–65 years to donate.');
       return;
     }
     if (!f.bloodGroupId) {
@@ -745,6 +811,10 @@ export class RegisterComponent implements OnInit {
     this.error = '';
     if (!this.dob) {
       this.error = 'Please select your date of birth.';
+      return;
+    }
+    if (!this.isDobValid()) {
+      this.error = 'Age must be 18–65 years to donate.';
       return;
     }
     const mobile = String(this.form.mobile ?? '').replace(/\D/g, '').slice(0, 10);

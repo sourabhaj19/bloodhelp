@@ -36,15 +36,22 @@ export class AuditService {
     action?: string;
     page?: number;
     pageSize?: number;
+    from?: Date;
+    to?: Date;
   }) {
     const page = Math.max(1, query.page ?? 1);
-    const pageSize = Math.min(100, query.pageSize ?? 20);
+    const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const skip = (page - 1) * pageSize;
     const where: any = {};
     if (query.entityType) where.entityType = query.entityType;
     if (query.entityId) where.entityId = query.entityId;
     if (query.actorUserId) where.actorUserId = query.actorUserId;
     if (query.action) where.action = query.action as any;
+    if (query.from || query.to) {
+      where.createdAt = {};
+      if (query.from) where.createdAt.gte = query.from;
+      if (query.to) where.createdAt.lte = query.to;
+    }
     const [total, items] = await Promise.all([
       this.prisma.auditLog.count({ where }),
       this.prisma.auditLog.findMany({

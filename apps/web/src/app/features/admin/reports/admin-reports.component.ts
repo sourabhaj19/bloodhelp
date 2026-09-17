@@ -155,7 +155,6 @@ export class AdminReportsComponent implements OnInit {
       },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Failed to load reports');
         this.loading = false;
         this.cdr.markForCheck();
       },

@@ -12,6 +12,7 @@ interface DashboardData {
     unreadNotifications: number;
   };
   myLocation: { area: string; latitude: number; longitude: number };
+  verification?: { emailVerified: boolean; mobileVerified: boolean };
 }
 
 @Component({
@@ -34,9 +35,9 @@ interface DashboardData {
       </div>
     </div>
 
-    <div *ngIf="needsVerification()" class="verify-banner mb-3" role="status" aria-live="polite">
+    <div *ngIf="showVerifyBanner" class="verify-banner mb-3" role="status" aria-live="polite">
       <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-      <span>{{ verificationHint() }}</span>
+      <span>{{ verificationHint }}</span>
       <a routerLink="/profile" class="link">Verify now</a>
     </div>
 
@@ -156,30 +157,23 @@ export class DashboardComponent implements OnInit {
   data: DashboardData | null = null;
   loading = true;
   error = '';
-  emailVerified = true;
-  mobileVerified = true;
+  showVerifyBanner = false;
+  verificationHint = '';
 
   ngOnInit() {
     this.load();
-    this.http.get<any>('/api/users/me').subscribe({
-      next: (r) => {
-        const me = r.data ?? r;
-        this.emailVerified = me?.emailVerified !== false;
-        this.mobileVerified = me?.mobileVerified !== false;
-        this.cdr.markForCheck();
-      },
-      error: () => {},
-    });
   }
 
-  needsVerification(): boolean {
-    return !this.emailVerified || !this.mobileVerified;
-  }
-
-  verificationHint(): string {
-    if (!this.emailVerified && !this.mobileVerified) return 'Your email and mobile are unverified.';
-    if (!this.emailVerified) return 'Your email is unverified.';
-    return 'Your mobile number is unverified.';
+  private updateVerification() {
+    const v = this.data?.verification;
+    // Backend embeds verification; default to verified (no banner) if missing
+    const emailVerified = v?.emailVerified !== false;
+    const mobileVerified = v?.mobileVerified !== false;
+    this.showVerifyBanner = !emailVerified || !mobileVerified;
+    if (!emailVerified && !mobileVerified) this.verificationHint = 'Your email and mobile are unverified.';
+    else if (!emailVerified) this.verificationHint = 'Your email is unverified.';
+    else if (!mobileVerified) this.verificationHint = 'Your mobile number is unverified.';
+    else this.verificationHint = '';
   }
 
   go(url: string) {
@@ -193,12 +187,12 @@ export class DashboardComponent implements OnInit {
     this.http.get<any>('/api/dashboard').subscribe({
       next: (r) => {
         this.data = r.data ?? r;
+        this.updateVerification();
         this.loading = false;
         this.cdr.markForCheck();
       },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Failed to load dashboard');
         this.loading = false;
         this.cdr.markForCheck();
       },

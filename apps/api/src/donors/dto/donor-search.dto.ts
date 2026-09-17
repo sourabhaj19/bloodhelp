@@ -6,13 +6,13 @@ export class DonorSearchDto {
   @ApiPropertyOptional() @IsOptional() @IsString() country?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() state?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() countryId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() stateId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() cityId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() countryId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() stateId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() cityId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() area?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() pinCode?: string;
 
-  @ApiPropertyOptional() @IsOptional() @IsString() bloodGroupId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() bloodGroupId?: string;
 
   // active default true; optional filter
   @ApiPropertyOptional({ default: true }) @IsOptional() @Type(() => String) @IsString() active?: string;

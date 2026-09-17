@@ -19,6 +19,10 @@ export class DonorsService {
     return `${visible}${masked} ${last ? last.charAt(0) + '.' : ''}`;
   }
 
+  private escapeLike(value: string): string {
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  }
+
   private maskMobile(mobile?: string, dialCode?: string): string {
     if (!mobile) return '';
     const digits = String(mobile).replace(/\D/g, '');
@@ -67,13 +71,14 @@ export class DonorsService {
     else if (dto.state) where.state = { name: dto.state };
     if (dto.cityId) where.cityId = dto.cityId;
     else if (dto.city) where.city = { name: dto.city };
-    if (dto.area) where.area = { contains: dto.area };
+    if (dto.area) where.area = { contains: this.escapeLike(dto.area) };
     if (dto.pinCode) where.pinCode = dto.pinCode;
     if (dto.search) {
+      const s = this.escapeLike(dto.search);
       where.OR = [
-        { firstName: { contains: dto.search } },
-        { lastName: { contains: dto.search } },
-        { area: { contains: dto.search } },
+        { firstName: { contains: s } },
+        { lastName: { contains: s } },
+        { area: { contains: s } },
       ];
     }
 
@@ -168,8 +173,8 @@ export class DonorsService {
       whereParams.push(dto.pinCode);
     }
     if (dto.area) {
-      whereClauses.push('u.area LIKE ?');
-      whereParams.push(`%${dto.area}%`);
+      whereClauses.push("u.area LIKE ? ESCAPE '\\\\'");
+      whereParams.push(`%${this.escapeLike(dto.area)}%`);
     }
 
     // Haversine distance expression in km (MySQL)

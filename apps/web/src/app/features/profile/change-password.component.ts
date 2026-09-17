@@ -72,7 +72,7 @@ export class ChangePasswordComponent {
       this.errors.showSuccess('Password changed. All other devices were logged out.');
     } catch (e: any) {
       this.pwError = this.errors.getUserMessage(e);
-      this.errors.handleHttpError(e, 'Password change failed');
+      // banner only — no duplicate toast
     } finally {
       this.pwSaving = false;
       this.cdr.markForCheck();

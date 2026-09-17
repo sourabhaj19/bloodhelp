@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { pendingChangesGuard } from './core/guards/pending-changes.guard';
 
 export const routes: Routes = [
   // ── Public — PublicLayout ──────────────────────────────────────────────
@@ -46,6 +47,7 @@ export const routes: Routes = [
       {
         path: 'register',
         canActivate: [guestGuard],
+        canDeactivate: [pendingChangesGuard],
         loadComponent: () =>
           import('./features/auth/register.component').then((m) => m.RegisterComponent),
       },

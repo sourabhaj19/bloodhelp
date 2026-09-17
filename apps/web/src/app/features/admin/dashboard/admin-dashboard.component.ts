@@ -109,7 +109,6 @@ export class AdminDashboardComponent implements OnInit {
       next: (r) => { this.data = r.data ?? r; this.loading = false; this.cdr.markForCheck(); },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Failed to load admin dashboard');
         this.loading = false;
         this.cdr.markForCheck();
       },

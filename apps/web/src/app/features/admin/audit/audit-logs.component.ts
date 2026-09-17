@@ -18,24 +18,35 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
 
     <p-card styleClass="mb-3">
       <div class="formgrid grid">
-        <div class="field col-12 md:col-3">
+        <div class="field col-12 md:col-4">
           <label for="entityType">Entity type</label>
           <input pInputText id="entityType" [(ngModel)]="filters.entityType" placeholder="e.g. User" class="w-full" />
         </div>
-        <div class="field col-12 md:col-3">
+        <div class="field col-12 md:col-4">
           <label for="entityId">Entity ID</label>
-          <input pInputText id="entityId" [(ngModel)]="filters.entityId" placeholder="UUID" class="w-full" />
+          <input pInputText id="entityId" [(ngModel)]="filters.entityId" placeholder="UUID" class="w-full" #entityIdCtrl="ngModel" pattern="^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" />
+          <small class="p-error" *ngIf="filters.entityId && !isUuid(filters.entityId)">Must be a valid UUID</small>
         </div>
-        <div class="field col-12 md:col-3">
+        <div class="field col-12 md:col-4">
           <label for="action">Action</label>
           <p-dropdown inputId="action" [(ngModel)]="filters.action" [options]="actionOptions" placeholder="All actions" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
         </div>
-        <div class="field col-12 md:col-3">
+        <div class="field col-12 md:col-4">
           <label for="actor">Actor user ID</label>
           <input pInputText id="actor" [(ngModel)]="filters.actorUserId" placeholder="UUID" class="w-full" />
+          <small class="p-error" *ngIf="filters.actorUserId && !isUuid(filters.actorUserId)">Must be a valid UUID</small>
         </div>
+        <div class="field col-12 md:col-4">
+          <label for="from">From date</label>
+          <p-calendar inputId="from" [(ngModel)]="filters.from" dateFormat="yy-mm-dd" [showIcon]="true" placeholder="YYYY-MM-DD" styleClass="w-full" appendTo="body" [baseZIndex]="1200" [maxDate]="filters.to || today"></p-calendar>
+        </div>
+        <div class="field col-12 md:col-4">
+          <label for="to">To date</label>
+          <p-calendar inputId="to" [(ngModel)]="filters.to" dateFormat="yy-mm-dd" [showIcon]="true" placeholder="YYYY-MM-DD" styleClass="w-full" appendTo="body" [baseZIndex]="1200" [minDate]="filters.from || null" [maxDate]="today"></p-calendar>
+        </div>
+        <small class="p-error col-12" *ngIf="filters.from && filters.to && filters.from > filters.to">From must be before To</small>
         <div class="col-12 flex gap-2">
-          <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
+          <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading" [disabled]="!filtersValid()"></p-button>
           <p-button label="Clear" severity="secondary" [outlined]="true" (onClick)="clear()"></p-button>
         </div>
       </div>
@@ -148,7 +159,7 @@ export class AuditLogsComponent implements OnInit {
 
   actionOptions = ['CREATE','UPDATE','DELETE','ACTIVATE','DEACTIVATE','SOFT_DELETE','STATUS_CHANGE','ROLE_CHANGE'];
 
-  filters: any = { entityType:'', entityId:'', action:'', actorUserId:'' };
+  filters: any = { entityType:'', entityId:'', action:'', actorUserId:'', from:null, to:null };
   page = 1;
   pageSize = 20;
   result: any = null;
@@ -156,27 +167,50 @@ export class AuditLogsComponent implements OnInit {
   error = '';
   dialog = false;
   selected: any = null;
+  today: Date = new Date();
+
+  private uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  isUuid(v: string): boolean { return this.uuidRe.test(String(v ?? '').trim()); }
+  filtersValid(): boolean {
+    if (this.filters.entityId?.trim() && !this.isUuid(this.filters.entityId)) return false;
+    if (this.filters.actorUserId?.trim() && !this.isUuid(this.filters.actorUserId)) return false;
+    if (this.filters.from && this.filters.to && this.filters.from > this.filters.to) return false;
+    return true;
+  }
 
   ngOnInit(){ this.load(); }
 
   onSearch(){ this.page=1; this.load(); }
   clear(){
-    this.filters = { entityType:'', entityId:'', action:'', actorUserId:'' };
+    this.filters = { entityType:'', entityId:'', action:'', actorUserId:'', from:null, to:null };
     this.page=1;
+    this.result=null;
     this.load();
   }
   onPage(e:any){ this.page=e.page+1; this.pageSize=e.rows; this.load(); }
 
+  private fmtDate(d: any): string {
+    if (!d) return '';
+    const dt = d instanceof Date ? d : new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    return dt.toISOString().slice(0,10);
+  }
+
   load(){
+    if (!this.filtersValid()) return;
     this.loading=true; this.error=''; this.cdr.markForCheck();
     let params = new HttpParams().set('page',String(this.page)).set('pageSize',String(this.pageSize));
     if(this.filters.entityType?.trim()) params=params.set('entityType',this.filters.entityType.trim());
     if(this.filters.entityId?.trim()) params=params.set('entityId',this.filters.entityId.trim());
     if(this.filters.action) params=params.set('action',this.filters.action);
     if(this.filters.actorUserId?.trim()) params=params.set('actorUserId',this.filters.actorUserId.trim());
+    const f = this.fmtDate(this.filters.from);
+    const t = this.fmtDate(this.filters.to);
+    if (f) params=params.set('from',f);
+    if (t) params=params.set('to',t);
     this.http.get<any>('/api/admin/audit-logs',{params}).subscribe({
       next:(r)=>{ this.result=r.data??r; this.loading=false; this.cdr.markForCheck(); },
-      error:(e)=>{ this.error=this.errors.getUserMessage(e); this.errors.handleHttpError(e,'Failed to load audit logs'); this.loading=false; this.cdr.markForCheck(); }
+      error:(e)=>{ this.error=this.errors.getUserMessage(e); this.loading=false; this.cdr.markForCheck(); }
     });
   }
 

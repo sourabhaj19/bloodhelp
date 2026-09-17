@@ -177,7 +177,6 @@ export class ProfileComponent implements OnInit {
       },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Failed to load profile');
         this.loading = false;
         this.cdr.markForCheck();
       },
@@ -362,7 +361,6 @@ export class ProfileComponent implements OnInit {
       },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Save failed');
         this.saving = false;
         this.cdr.markForCheck();
       },

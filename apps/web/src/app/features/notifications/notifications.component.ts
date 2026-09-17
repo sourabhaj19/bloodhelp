@@ -101,7 +101,6 @@ export class NotificationsComponent implements OnInit {
       },
       error: (e) => {
         this.error = this.errors.getUserMessage(e);
-        this.errors.handleHttpError(e, 'Failed to load notifications');
         this.loading = false;
         this.cdr.markForCheck();
       },

@@ -20,6 +20,7 @@ export class DashboardService {
     return {
       myLocation: { cityId: user.cityId, area: user.area, latitude: Number(user.latitude), longitude: Number(user.longitude) },
       stats: { totalDonorsNearby, myAppreciationsReceived, myAppreciationsGiven, unreadNotifications },
+      verification: { emailVerified: user.emailVerified, mobileVerified: user.mobileVerified },
     };
   }
 
