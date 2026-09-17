@@ -41,13 +41,17 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <p-dropdown inputId="radius" [(ngModel)]="filters.radiusKm" [options]="radiusOptions" placeholder="Any radius" [showClear]="true" [appendTo]="'body'" styleClass="w-full"></p-dropdown>
           <small *ngIf="filters.radiusKm && filters.lat == null" class="p-error block mt-1">Radius needs location — click “Near me” first (filter will be ignored).</small>
         </div>
-        <div class="col-12 flex align-items-end gap-2 flex-wrap">
+        <div class="col-12 flex align-items-center gap-2 flex-wrap pt-1">
           <p-button label="Search" icon="pi pi-search" (onClick)="onSearch()" [loading]="loading"></p-button>
+          <p-button label="Reset" severity="secondary" [text]="true" (onClick)="reset()"></p-button>
+          <span class="actions-sep hidden md:block" aria-hidden="true"></span>
           <p-button label="Near me" icon="pi pi-map-marker" severity="secondary" [outlined]="true" (onClick)="useMyLocation()" pTooltip="Use GPS location for distance + radius"></p-button>
           <p-button label="View all on map" icon="pi pi-map" severity="secondary" [outlined]="true" (onClick)="showAllOnMap()" [disabled]="loading || mappableCount === 0" pTooltip="Fit all donor pins into the map view below"></p-button>
-          <p-button label="Reset" severity="secondary" [text]="true" (onClick)="reset()"></p-button>
-          <span *ngIf="filters.lat != null" class="muted text-sm ml-2" [pTooltip]="filters.lat + ', ' + filters.lng" tooltipPosition="bottom">📍 Location enabled · distance shown</span>
-          <p-button *ngIf="filters.lat != null" label="Clear location" icon="pi pi-times" severity="secondary" [text]="true" (onClick)="clearLocation()"></p-button>
+          <span class="flex-grow-1"></span>
+          <span *ngIf="filters.lat != null" class="location-pill" [pTooltip]="filters.lat + ', ' + filters.lng" tooltipPosition="bottom">
+            <span class="text-sm">📍 Location on · distances shown</span>
+            <p-button label="Clear location" icon="pi pi-times" severity="secondary" [text]="true" size="small" (onClick)="clearLocation()"></p-button>
+          </span>
         </div>
         <small class="muted" *ngIf="filters.lat == null && !filters.radiusKm">Tip: click <strong>Near me</strong> to enable the <strong>Distance</strong> column and radius filtering.</small>
         <p-message *ngIf="filters.lat == null && filters.radiusKm" severity="warn" text="You set a radius but location is off — enable “Near me” to filter by distance." styleClass="w-full mt-2"></p-message>
@@ -191,6 +195,8 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         margin-bottom: 12px;
       }
       :host ::ng-deep .mobile-action { min-height: 44px; }
+      .actions-sep { width: 1px; align-self: stretch; background: #eaecf0; margin: 2px 4px; }
+      .location-pill { display: inline-flex; align-items: center; gap: 4px; background: #f2f4f7; border: 1px solid #eaecf0; border-radius: 999px; padding: 2px 4px 2px 12px; color: #344054; }
       @media (max-width: 767px) {
         .desktop-table { display: none; }
         .mobile-cards { display: block; }
