@@ -174,8 +174,6 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         <p-button label="Send thanks" icon="pi pi-heart" (onClick)="submitThank()" [loading]="thanking"></p-button>
       </ng-template>
     </p-dialog>
-
-    <p-confirmDialog></p-confirmDialog>
   `,
   styles: [
     `

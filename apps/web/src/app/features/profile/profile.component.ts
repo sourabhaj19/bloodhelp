@@ -115,7 +115,6 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <p-button label="Verify" icon="pi pi-check" (onClick)="confirmOtp()" [loading]="otpVerifying" [disabled]="otp.trim().length !== 6"></p-button>
         </div>
       </p-dialog>
-      <p-confirmDialog></p-confirmDialog>
     </div>
   `,
   styles: [

@@ -90,8 +90,6 @@ import { MasterDataTabsComponent } from './master-data-tabs.component';
         <p-button [label]="editing ? 'Save' : 'Create'" icon="pi pi-check" (onClick)="save()" [loading]="saving" [disabled]="!valid()"></p-button>
       </ng-template>
     </p-dialog>
-
-    <p-confirmDialog></p-confirmDialog>
   `,
   styles: [
     ` .muted { color: #98a2b3; } .field label { display: block; margin-bottom: .45rem; font-weight: 700; font-size: .87rem; color: #344054; } `,

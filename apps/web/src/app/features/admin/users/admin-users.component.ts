@@ -57,7 +57,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
             <td>
               <div class="flex gap-2">
                 <p-button [label]="u.active ? 'Deactivate' : 'Activate'" size="small" severity="secondary" [outlined]="true" (onClick)="toggle(u)"></p-button>
-                <p-button label="Delete" size="small" severity="danger" [outlined]="true" (onClick)="askRemove(u)"></p-button>
+                <p-button label="Delete" size="small" severity="danger" (onClick)="askRemove(u)"></p-button>
               </div>
             </td>
           </tr>
@@ -79,7 +79,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
           <div class="flex gap-2 flex-wrap">
             <p-button *ngIf="u.latitude != null && u.longitude != null" label="View on map" icon="pi pi-map-marker" size="small" severity="secondary" [outlined]="true" (onClick)="focusOnMap(u)" styleClass="mobile-action"></p-button>
             <p-button [label]="u.active ? 'Deactivate' : 'Activate'" size="small" severity="secondary" [outlined]="true" (onClick)="toggle(u)" styleClass="mobile-action"></p-button>
-            <p-button label="Delete" size="small" severity="danger" [outlined]="true" (onClick)="askRemove(u)" styleClass="mobile-action"></p-button>
+            <p-button label="Delete" size="small" severity="danger" (onClick)="askRemove(u)" styleClass="mobile-action"></p-button>
           </div>
         </div>
       </div>
@@ -93,8 +93,8 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
       </p-paginator>
     </p-card>
 
-    <p-dialog [(visible)]="mapDialog" [modal]="true" [dismissableMask]="true" [draggable]="false"
-      [style]="{ width: 'min(900px, 96vw)' }" [header]="mapDialogTitle"
+    <p-dialog [(visible)]="mapDialog" [modal]="true" [dismissableMask]="true" [draggable]="false" [closable]="true" closeIcon="pi pi-times" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false"
+      [style]="{ width: 'min(900px, 96vw)' }" [header]="mapDialogTitle" [contentStyle]="{'overflow':'auto'}" styleClass="centered-dialog"
       (onShow)="onMapDialogShow()" (onHide)="onMapDialogHide()">
       <app-donor-map *ngIf="mapDialog"
         [donors]="mapDialogDonors"
@@ -109,8 +109,6 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
         <p-button *ngIf="mapDialogMode === 'single'" label="Show all pins" icon="pi pi-map" size="small" severity="secondary" [outlined]="true" (onClick)="dialogShowAll()"></p-button>
       </div>
     </p-dialog>
-
-    <p-confirmDialog></p-confirmDialog>
   `,
   styles: [
     `
@@ -302,6 +300,7 @@ export class AdminUsersComponent implements OnInit {
       header: 'Delete user',
       icon: 'pi pi-exclamation-triangle',
       acceptButtonStyleClass: 'p-button-danger',
+      rejectButtonStyleClass: 'p-button-text p-button-secondary',
       accept: () => {
         this.http.delete<any>(`/api/admin/users/${u.id}`).subscribe({
           next: () => {

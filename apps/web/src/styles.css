@@ -139,22 +139,35 @@ a { color: inherit; text-decoration: none; }
 
 /* ═══════════════ PrimeNG brand skin ═══════════════ */
 .p-button { border-radius: 10px; font-weight: 700; transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s; }
-.p-button:not(.p-button-text):not(.p-button-outlined):hover { transform: translateY(-1px); }
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-link):hover { transform: translateY(-1px); }
 .p-button:active { transform: translateY(0); }
-.p-button.p-button-danger,
-.p-button:not(.p-button-secondary):not(.p-button-success):not(.p-button-info):not(.p-button-warning):not(.p-button-help):not(.p-button-text):not(.p-button-outlined):not(.p-button-plain) {
+.p-button.p-button-danger:not(.p-button-outlined):not(.p-button-text):not(.p-button-plain):not(.p-link),
+.p-button:not(.p-button-secondary):not(.p-button-success):not(.p-button-info):not(.p-button-warning):not(.p-button-help):not(.p-button-danger):not(.p-button-text):not(.p-button-outlined):not(.p-button-plain):not(.p-link) {
   background: linear-gradient(135deg, var(--blood-500), var(--blood-600));
   border-color: var(--blood-600);
   box-shadow: 0 6px 16px -6px rgba(180, 35, 24, 0.55);
 }
-.p-button.p-button-danger:hover,
-.p-button:not(.p-button-secondary):not(.p-button-success):not(.p-button-info):not(.p-button-warning):not(.p-button-help):not(.p-button-text):not(.p-button-outlined):not(.p-button-plain):hover {
+.p-button.p-button-danger:not(.p-button-outlined):not(.p-button-text):not(.p-button-plain):not(.p-link):hover,
+.p-button:not(.p-button-secondary):not(.p-button-success):not(.p-button-info):not(.p-button-warning):not(.p-button-help):not(.p-button-danger):not(.p-button-text):not(.p-button-outlined):not(.p-button-plain):not(.p-link):hover {
   background: var(--blood-700);
   border-color: var(--blood-700);
 }
-.p-button.p-button-outlined:not(.p-button-secondary) { color: var(--blood-600); border-color: var(--blood-200); }
-.p-button.p-button-outlined:not(.p-button-secondary):hover { background: var(--blood-50); border-color: var(--blood-600); }
-.p-button.p-button-text:not(.p-button-secondary) { color: var(--blood-600); }
+.p-button.p-button-outlined:not(.p-button-secondary):not(.p-button-success):not(.p-button-info):not(.p-button-warning):not(.p-button-help):not(.p-button-danger) { color: var(--blood-600); border-color: var(--blood-200); }
+.p-button.p-button-outlined:not(.p-button-secondary):not(.p-button-success):not(.p-button-info):not(.p-button-warning):not(.p-button-help):not(.p-button-danger):hover { background: var(--blood-50); border-color: var(--blood-600); }
+.p-button.p-button-text:not(.p-button-secondary):not(.p-button-success):not(.p-button-info):not(.p-button-warning):not(.p-button-help):not(.p-button-danger) { color: var(--blood-600); }
+
+/* Dialog close: blood-red button with white × (normal + hover). */
+.p-dialog .p-dialog-header .p-dialog-header-icon {
+  background: linear-gradient(135deg, var(--blood-500), var(--blood-600));
+  border-color: var(--blood-600);
+  box-shadow: 0 6px 16px -6px rgba(180, 35, 24, 0.55);
+  color: #fff;
+}
+.p-dialog .p-dialog-header .p-dialog-header-icon:enabled:hover {
+  background: var(--blood-700);
+  border-color: var(--blood-700);
+  color: #fff;
+}
 
 .p-card {
   border-radius: var(--radius);

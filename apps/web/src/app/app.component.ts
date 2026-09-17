@@ -10,7 +10,7 @@ import { LoadingService } from './core/services/loading.service';
   template: `
     <router-outlet />
     <p-toast position="top-right" [breakpoints]="{ '640px': { width: '92vw' } }"></p-toast>
-    <p-confirmDialog></p-confirmDialog>
+    <p-confirmDialog appendTo="body" position="center" [style]="{ width: 'min(400px, 94vw)' }" [breakpoints]="{ '640px': { width: '92vw' } }"></p-confirmDialog>
     <div *ngIf="loading.isLoading()" class="global-loading-overlay">
       <p-progressSpinner strokeWidth="4" styleClass="w-3rem h-3rem"></p-progressSpinner>
     </div>

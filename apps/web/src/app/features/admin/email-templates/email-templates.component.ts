@@ -102,8 +102,6 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
         <p-button label="Send" icon="pi pi-send" (onClick)="sendTest()" [loading]="testing_" [disabled]="!testTo.trim()"></p-button>
       </ng-template>
     </p-dialog>
-
-    <p-confirmDialog></p-confirmDialog>
   `,
   styles: [
     ` .muted { color: #98a2b3; } .uppercase { text-transform: uppercase; } .hint { color: #98a2b3; font-size: .78rem; } .mono { font-family: ui-monospace, monospace; font-size: .85rem; } .field label { display: block; margin-bottom: .45rem; font-weight: 700; font-size: .87rem; color: #344054; } `,
