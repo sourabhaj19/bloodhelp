@@ -56,8 +56,23 @@ export class MasterDataService {
   }
 
   async deleteCountryCode(id: string) {
-    const inUse = await this.prisma.user.count({ where: { countryCodeId: id } });
-    if (inUse > 0) throw new ConflictException({ code: 'MASTER_IN_USE', message: 'Country code in use' });
+    // Only live users block the delete — soft-deleted accounts don't count,
+    // so the usage dialog below always shows actionable records.
+    const where: any = { countryCodeId: id, deletedAt: null };
+    const inUse = await this.prisma.user.count({ where });
+    if (inUse > 0) {
+      const sample = await this.prisma.user.findMany({
+        where,
+        select: { id: true, firstName: true, lastName: true, email: true, mobile: true },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      });
+      throw new ConflictException({
+        code: 'MASTER_IN_USE',
+        message: `Country code is used by ${inUse} user(s) and cannot be deleted`,
+        details: { userCount: inUse, sample },
+      });
+    }
     const existing = await this.prisma.countryCode.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Country code not found' });
     return this.prisma.countryCode.delete({ where: { id } });

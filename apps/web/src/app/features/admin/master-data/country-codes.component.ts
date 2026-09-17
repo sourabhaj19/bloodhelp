@@ -14,7 +14,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
     <div class="flex flex-column md:flex-row md:align-items-center md:justify-content-between gap-2 mb-3">
       <div>
         <h1 class="page-title">Country codes</h1>
-        <p class="page-sub">Dial codes for mobile numbers. Delete is blocked while a code is in use.</p>
+        <p class="page-sub">Dial codes for mobile numbers. Delete is blocked while a code is in use — blocked deletes show where it is used.</p>
       </div>
       <p-button label="Add code" icon="pi pi-plus" (onClick)="openNew()"></p-button>
     </div>
@@ -74,6 +74,35 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
         <p-button [label]="editing ? 'Save' : 'Create'" icon="pi pi-check" (onClick)="save()" [loading]="saving" [disabled]="!valid()"></p-button>
       </ng-template>
     </p-dialog>
+
+    <p-dialog [(visible)]="usageDialog" header="Where this code is used" [modal]="true" [dismissableMask]="true" [draggable]="false"
+      [closable]="true" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false"
+      [style]="{ width: 'min(560px, 94vw)' }" [contentStyle]="{'overflow':'auto'}">
+      <p class="mt-0">
+        <strong>{{ usageFor?.dialCode }}</strong> is assigned to
+        <strong>{{ usageCount }} user{{ usageCount === 1 ? '' : 's' }}</strong>.
+        Change the dial code on these accounts before deleting it.
+      </p>
+      <p-table [value]="usageSample" styleClass="p-datatable-sm" responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr><th>Name</th><th>Email</th><th>Mobile</th></tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-u>
+          <tr>
+            <td><strong>{{ u.firstName }} {{ u.lastName }}</strong></td>
+            <td style="word-break:break-all">{{ u.email }}</td>
+            <td>{{ u.mobile || '—' }}</td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr><td colspan="3" class="text-center muted">No user details returned.</td></tr>
+        </ng-template>
+      </p-table>
+      <p class="muted text-sm mb-0" *ngIf="usageCount > usageSample.length">Showing {{ usageSample.length }} of {{ usageCount }}.</p>
+      <ng-template pTemplate="footer">
+        <p-button label="Close" severity="secondary" [text]="true" (onClick)="usageDialog = false"></p-button>
+      </ng-template>
+    </p-dialog>
   `,
   styles: [
     ` .muted { color: #98a2b3; } .field label { display: block; margin-bottom: .45rem; font-weight: 700; font-size: .87rem; color: #344054; } `,
@@ -93,6 +122,12 @@ export class MasterCountryCodesComponent implements OnInit {
   dialog = false;
   editing: any = null;
   form: any = { dialCode: '', label: '', countryId: '', active: true };
+
+  // ── "Where it's used" state — filled from the 409 MASTER_IN_USE details ──
+  usageDialog = false;
+  usageFor: any = null;
+  usageCount = 0;
+  usageSample: any[] = [];
 
   ngOnInit() {
     this.http.get<any>('/api/master/countries').subscribe({
@@ -163,9 +198,23 @@ export class MasterCountryCodesComponent implements OnInit {
       accept: () => {
         this.http.delete<any>(`/api/master/country-codes/${c.id}`).subscribe({
           next: () => { this.errors.showSuccess('Country code deleted.'); this.load(); },
-          error: (e) => this.errors.handleHttpError(e, 'Delete failed'),
+          error: (e) => this.onDeleteError(e, c),
         });
       },
     });
+  }
+
+  private onDeleteError(e: any, c: any) {
+    const code = e?.error?.error?.code ?? e?.error?.code;
+    if (e?.status === 409 && code === 'MASTER_IN_USE') {
+      const details = e?.error?.error?.details ?? e?.error?.details ?? {};
+      this.usageFor = c;
+      this.usageCount = Number(details?.userCount) || 0;
+      this.usageSample = Array.isArray(details?.sample) ? details.sample : [];
+      this.usageDialog = true;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.errors.handleHttpError(e, 'Delete failed');
   }
 }
