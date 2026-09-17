@@ -50,7 +50,7 @@ import { ErrorHandlerService } from '../../../core/services/error-handler.servic
       </p-table>
     </p-card>
 
-    <p-dialog [(visible)]="dialog" [header]="editing ? 'Edit country code' : 'Add country code'" [modal]="true" [style]="{ width: 'min(460px, 94vw)' }">
+    <p-dialog [(visible)]="dialog" [header]="editing ? 'Edit country code' : 'Add country code'" [modal]="true" [dismissableMask]="true" [draggable]="false" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false" [contentStyle]="{'overflow':'auto'}" [style]="{ width: 'min(460px, 94vw)' }">
       <div class="flex flex-column gap-3">
         <div class="field mb-0">
           <label for="dial">Dial code</label>

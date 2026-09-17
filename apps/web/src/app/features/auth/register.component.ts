@@ -227,6 +227,13 @@ declare const L: any;
         [modal]="true"
         [dismissableMask]="true"
         [draggable]="false"
+        appendTo="body"
+        [baseZIndex]="1100"
+        [autoZIndex]="true"
+        [keepInViewport]="true"
+        [blockScroll]="true"
+        [resizable]="false"
+        [contentStyle]="{'overflow':'auto'}"
         [style]="{ width: 'min(560px, 96vw)' }"
         (onHide)="onLocationDialogHide()"
       >

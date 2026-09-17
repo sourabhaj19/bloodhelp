@@ -39,7 +39,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
       </p-table>
     </p-card>
 
-    <p-dialog [(visible)]="dialog" header="Report brief" [modal]="true" [style]="{ width: 'min(520px, 96vw)' }">
+    <p-dialog [(visible)]="dialog" header="Report brief" [modal]="true" [dismissableMask]="true" [draggable]="false" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false" [contentStyle]="{'overflow':'auto'}" [style]="{ width: 'min(520px, 96vw)' }">
       <div *ngIf="selected" class="flex flex-column gap-3">
         <div class="flex align-items-center justify-content-between">
           <p-tag [value]="pretty(selected.status)" [severity]="statusSeverity(selected.status)"></p-tag>

@@ -66,7 +66,7 @@ const STATUSES = ['OPEN', 'UNDER_REVIEW', 'RESOLVED', 'REJECTED'] as const;
       </p-paginator>
     </p-card>
 
-    <p-dialog [(visible)]="dialog" header="Review report" [modal]="true" [style]="{ width: 'min(560px, 96vw)' }">
+    <p-dialog [(visible)]="dialog" header="Review report" [modal]="true" [dismissableMask]="true" [draggable]="false" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false" [contentStyle]="{'overflow':'auto'}" [style]="{ width: 'min(560px, 96vw)' }">
       <div *ngIf="selected" class="flex flex-column gap-3">
         <div class="grid">
           <div class="col-6"><div class="muted text-sm">Reported user</div><strong>{{ selected.reportedUser?.firstName }} {{ selected.reportedUser?.lastName }}</strong><div class="muted text-sm">{{ selected.reportedUser?.email }}</div></div>

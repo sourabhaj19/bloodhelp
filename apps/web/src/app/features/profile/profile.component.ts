@@ -102,7 +102,7 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
         </form>
       </p-card>
 
-      <p-dialog [(visible)]="otpDialog" header="Enter verification code" [modal]="true" [style]="{ width: 'min(400px, 94vw)' }">
+      <p-dialog [(visible)]="otpDialog" header="Enter verification code" [modal]="true" [dismissableMask]="true" [draggable]="false" appendTo="body" [baseZIndex]="1100" [autoZIndex]="true" [keepInViewport]="true" [blockScroll]="true" [resizable]="false" [contentStyle]="{'overflow':'auto'}" [style]="{ width: 'min(400px, 94vw)' }">
         <p class="mt-0">We sent a 6-digit code to <strong>{{ profile?.mobile }}</strong>. It expires in 10 minutes.</p>
         <p-message *ngIf="devOtp && isDevMode" severity="info" [text]="'Dev mode — your code is ' + devOtp" styleClass="w-full mb-3"></p-message>
         <p-message *ngIf="otpError" severity="error" [text]="otpError" styleClass="w-full mb-3"></p-message>
