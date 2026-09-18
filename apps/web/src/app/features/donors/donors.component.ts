@@ -91,8 +91,8 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
             </td>
             <td>
               <div class="flex gap-2">
-                <p-button [label]="thankedIds.has(d.id) ? 'Thanked' : 'Thank'" icon="pi pi-heart" size="small" [severity]="thankedIds.has(d.id) ? 'success' : 'secondary'" [outlined]="!thankedIds.has(d.id)" [disabled]="thankedIds.has(d.id)" (onClick)="openThank(d)" [pTooltip]="thankedIds.has(d.id) ? 'You already thanked this donor' : 'Send thanks'"></p-button>
-                <p-button *ngIf="d.id !== myId" icon="pi pi-flag" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" pTooltip="Report user"></p-button>
+                <p-button [label]="hasThanked(d.id) ? 'Thanked' : 'Thank'" icon="pi pi-heart" size="small" [severity]="hasThanked(d.id) ? 'success' : 'secondary'" [outlined]="!hasThanked(d.id)" [disabled]="hasThanked(d.id)" (onClick)="openThank(d)" [pTooltip]="hasThanked(d.id) ? 'You already thanked this donor' : 'Send thanks'" ariaLabel="Send thanks"></p-button>
+                <p-button *ngIf="d.id !== myId" icon="pi pi-flag" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" pTooltip="Report user" ariaLabel="Report user"></p-button>
               </div>
             </td>
           </tr>
@@ -115,8 +115,8 @@ import { ErrorHandlerService } from '../../core/services/error-handler.service';
           <div class="text-sm mb-2"><span *ngIf="d.approxDistanceKm != null" class="font-bold" style="color:#b42318">~{{ d.approxDistanceKm }} km away</span><span *ngIf="d.approxDistanceKm == null" class="muted">Distance — enable “Near me”</span></div>
           <div class="flex gap-2 flex-wrap">
             <p-button *ngIf="d.latitude && d.longitude" label="View on map" icon="pi pi-map-marker" size="small" severity="secondary" [outlined]="true" (onClick)="focusOnMap(d)" styleClass="mobile-action"></p-button>
-            <p-button [label]="thankedIds.has(d.id) ? 'Thanked' : 'Thank'" icon="pi pi-heart" size="small" [severity]="thankedIds.has(d.id) ? 'success' : 'secondary'" [outlined]="!thankedIds.has(d.id)" [disabled]="thankedIds.has(d.id)" (onClick)="openThank(d)" styleClass="mobile-action"></p-button>
-            <p-button *ngIf="d.id !== myId" icon="pi pi-flag" label="Report" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" styleClass="mobile-action"></p-button>
+            <p-button [label]="hasThanked(d.id) ? 'Thanked' : 'Thank'" icon="pi pi-heart" size="small" [severity]="hasThanked(d.id) ? 'success' : 'secondary'" [outlined]="!hasThanked(d.id)" [disabled]="hasThanked(d.id)" (onClick)="openThank(d)" styleClass="mobile-action"></p-button>
+            <p-button *ngIf="d.id !== myId" icon="pi pi-flag" label="Report" size="small" severity="secondary" [text]="true" (onClick)="openReport(d)" styleClass="mobile-action" ariaLabel="Report user"></p-button>
           </div>
         </div>
       </div>
@@ -239,6 +239,9 @@ export class DonorsComponent implements OnInit, OnDestroy {
   thankTarget: any = null;
   thankMessage = 'Thank you for being a donor!';
   thankedIds = new Set<string>();
+  hasThanked(id: unknown): boolean {
+    return this.thankedIds.has(String(id ?? ''));
+  }
   filters: any = { bloodGroupId: '', countryId: '', stateId: '', cityId: '', area: '', radiusKm: '', lat: null, lng: null, page: 1, pageSize: 20 };
   private defaultCountryId = '';
   private searchSubject = new Subject<void>();
@@ -283,10 +286,14 @@ export class DonorsComponent implements OnInit, OnDestroy {
     if (get('cityId')) this.filters.cityId = get('cityId');
     if (get('area')) this.filters.area = get('area');
     if (get('radiusKm')) this.filters.radiusKm = get('radiusKm');
-    if (get('lat')) this.filters.lat = Number(get('lat'));
-    if (get('lng')) this.filters.lng = Number(get('lng'));
-    if (get('page')) this.filters.page = Number(get('page')) || 1;
-    if (get('pageSize')) this.filters.pageSize = Number(get('pageSize')) || 20;
+    const lat = Number(get('lat'));
+    const lng = Number(get('lng'));
+    if (get('lat') && Number.isFinite(lat)) this.filters.lat = lat;
+    if (get('lng') && Number.isFinite(lng)) this.filters.lng = lng;
+    const pg = Number(get('page'));
+    const ps = Number(get('pageSize'));
+    if (Number.isFinite(pg) && pg >= 1) this.filters.page = Math.floor(pg);
+    if (Number.isFinite(ps) && ps >= 1) this.filters.pageSize = Math.min(100, Math.floor(ps));
   }
 
   private syncUrl() {
@@ -566,7 +573,7 @@ export class DonorsComponent implements OnInit, OnDestroy {
   }
 
   openThank(donor: any) {
-    if (this.thankedIds.has(donor.id)) return;
+    if (this.thankedIds.has(String(donor.id))) return;
     this.thankTarget = donor;
     this.thankMessage = 'Thank you for being a donor!';
     this.thankDialog = true;

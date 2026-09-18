@@ -187,10 +187,14 @@ export class PublicSearchComponent implements OnInit, OnDestroy {
     if (get('cityId')) this.filters.cityId = get('cityId');
     if (get('area')) this.filters.area = get('area');
     if (get('radiusKm')) this.filters.radiusKm = get('radiusKm');
-    if (get('lat')) this.filters.lat = Number(get('lat'));
-    if (get('lng')) this.filters.lng = Number(get('lng'));
-    if (get('page')) this.filters.page = Number(get('page')) || 1;
-    if (get('pageSize')) this.filters.pageSize = Number(get('pageSize')) || 20;
+    const lat = Number(get('lat'));
+    const lng = Number(get('lng'));
+    if (get('lat') && Number.isFinite(lat)) this.filters.lat = lat;
+    if (get('lng') && Number.isFinite(lng)) this.filters.lng = lng;
+    const pg = Number(get('page'));
+    const ps = Number(get('pageSize'));
+    if (Number.isFinite(pg) && pg >= 1) this.filters.page = Math.floor(pg);
+    if (Number.isFinite(ps) && ps >= 1) this.filters.pageSize = Math.min(100, Math.floor(ps));
   }
 
   private syncUrl() {

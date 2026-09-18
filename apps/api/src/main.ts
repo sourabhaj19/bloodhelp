@@ -20,6 +20,13 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
+  // Refuse to boot in production with known/default secrets.
+  if (process.env.NODE_ENV === 'production') {
+    const access = process.env.JWT_ACCESS_SECRET || '';
+    if (!access || access.startsWith('replace-with-') || access.length < 32) {
+      throw new Error('JWT_ACCESS_SECRET must be set to >=32 random bytes in production');
+    }
+  }
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 

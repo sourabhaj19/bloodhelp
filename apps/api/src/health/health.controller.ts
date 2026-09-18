@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
@@ -69,12 +69,14 @@ export class HealthController {
     }
 
     const status = ready ? 200 : 503;
-    // Nest will still return 200 unless we throw; we keep envelope with status field for observability
-    // and let the caller inspect data.status
-    return {
+    const body = {
       success: ready,
       data: { status: ready ? 'ready' : 'not_ready', checks, timestamp: new Date().toISOString() },
       message: ready ? 'Service is ready' : 'Service not ready — dependency check failed',
     };
+    if (!ready) {
+      throw new ServiceUnavailableException(body);
+    }
+    return body;
   }
 }

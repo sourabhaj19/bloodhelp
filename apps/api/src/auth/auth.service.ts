@@ -270,7 +270,7 @@ export class AuthService {
       data: { userId: user.id, type: 'MOBILE_CHANGED', ipAddress: meta.ip, userAgent: meta.userAgent, metadata: { result: 'otp-sent' } as any },
     });
     // Dev/E2E helper mirroring the password-reset devToken pattern
-    return { sent: true, smsSkipped: result.skipped, devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined };
+    return { sent: true, smsSkipped: result.skipped, devOtp: process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? otp : undefined };
   }
 
   async verifyMobileOtp(userId: string, otp: string, meta: { ip?: string; userAgent?: string }) {
@@ -506,12 +506,8 @@ export class AuthService {
         firstName: user.firstName,
         resetLink: `${this.appUrl()}/reset-password?token=${raw}`,
       });
-      // In production: enqueue email via BullMQ -> EmailService
-      // For this implementation we log token (never in production logs with PII redaction, but dev helper)
-      this.logger.log(`Password reset token for ${user.email}: ${raw} (expires ${expiresAt.toISOString()}) — in production this is emailed`);
-      // Store raw in DB? No, only hash. Returning raw here only for dev/E2E when email provider not configured
-      // We do not expose raw to API response, but we log and also create notification later via worker
-      return { devToken: process.env.NODE_ENV !== 'production' ? raw : undefined };
+      // Never log raw reset tokens — they are emailed only.
+      return { devToken: process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? raw : undefined };
     } else if (user) {
       // User exists but inactive/deleted → still generic response but no token
       await this.prisma.securityEvent.create({

@@ -54,7 +54,7 @@ function hasCoords(d: any): boolean {
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div #mapEl class="donor-map" [style.height.px]="height" role="application" aria-label="Donor map"></div>
+    <div #mapEl class="donor-map" [style.height.px]="height" role="region" aria-label="Donor map. Use the donor list for full details."></div>
     <div *ngIf="!initialized && !loadError" class="map-empty muted text-sm">Loading map…</div>
     <div *ngIf="plottedCount === 0 && initialized" class="map-empty muted text-sm">
       No precise locations to plot for these results yet — try a wider radius or different filters.
@@ -102,6 +102,7 @@ function hasCoords(d: any): boolean {
       }
       :host ::ng-deep .donor-popup { font-size: 0.85rem; line-height: 1.4; }
       :host ::ng-deep .donor-popup strong { font-size: 0.9rem; }
+      :host ::ng-deep .leaflet-popup-content { max-width: min(220px, 70vw); word-wrap: break-word; }
       .map-empty { padding: 10px 2px 0; }
       .map-err { color: #b42318; }
       .muted { color: #667085; }

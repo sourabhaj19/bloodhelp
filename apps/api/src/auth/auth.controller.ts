@@ -117,11 +117,10 @@ export class AuthController {
     };
   }
 
+  @Public()
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Logout — revoke refresh family' })
+  @ApiOperation({ summary: 'Logout — revoke refresh family (works with expired access token)' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const cookieToken = (req.cookies as any)?.refresh_token as string | undefined;
     const bodyToken = (req.body as any)?.refreshToken as string | undefined;

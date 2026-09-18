@@ -37,11 +37,30 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           code = 'VALIDATION_ERROR';
         }
       }
+      if (status >= 500) {
+        this.logger.error(`${request.method} ${request.url} -> ${status} ${code}: ${message}`, exception.stack);
+      }
     } else if (exception instanceof Error) {
       this.logger.error(
         `${request.method} ${request.url} -> ${exception.message}`,
         exception.stack,
       );
+      // Map common Prisma errors to proper HTTP codes instead of 500.
+      const anyErr = exception as any;
+      if (anyErr?.code === 'P2002') {
+        status = HttpStatus.CONFLICT;
+        code = 'DUPLICATE';
+        message = 'Duplicate value violates a unique constraint';
+        details = anyErr?.meta;
+      } else if (anyErr?.code === 'P2025') {
+        status = HttpStatus.NOT_FOUND;
+        code = 'NOT_FOUND';
+        message = 'Record not found';
+      } else if (anyErr?.code === 'P2023' || anyErr?.code === 'P2003') {
+        status = HttpStatus.BAD_REQUEST;
+        code = 'BAD_REQUEST';
+        message = 'Invalid identifier or reference';
+      }
     }
 
     // Never leak internal messages in production for 500s — but in

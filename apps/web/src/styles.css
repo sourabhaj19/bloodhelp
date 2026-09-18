@@ -247,10 +247,33 @@ a { color: inherit; text-decoration: none; }
 .stagger > *:nth-child(6) { animation-delay: 0.32s; }
 
 /* ═══════════════ Responsive ═══════════════ */
+html, body { overflow-x: clip; }
+img, table { max-width: 100%; }
+.p-sidebar { max-width: 94vw; }
+.p-table-wrapper { overflow-x: auto; }
+.p-datatable .p-paginator { flex-wrap: wrap; gap: 4px; }
+:host ::ng-deep .p-dialog, .p-dialog { max-width: 94vw; }
+.desktop-nav { flex-wrap: wrap; }
 @media (max-width: 960px) {
   .desktop-nav { display: none; }
   .mobile-btn { display: inline-flex !important; }
   .hide-sm { display: none !important; }
-  .topbar { padding: 0 16px; }
+  .topbar { padding: 0 16px; min-height: 68px; height: auto; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
   .page-wrap { padding: 18px 14px 44px; }
+  .panel { padding: 18px 14px; margin: 14px 0; }
+  .p-dialog { max-width: 94vw !important; }
+  .p-calendar .p-datepicker, .p-dropdown-panel { max-width: 94vw !important; }
+}
+@media (max-width: 767px) {
+  .page-wrap { padding: 16px 12px 36px; }
+  .panel { padding: 16px 12px; }
+  .p-dialog .p-dialog-content .grid > [class*="col-6"] { width: 100%; flex: 0 0 100%; max-width: 100%; }
+  /* Force horizontal scroll instead of squeezed columns for tables lacking explicit min-width */
+  .p-datatable table { min-width: 560px; }
+  .p-tabmenu .p-tabmenu-nav, .p-tabview .p-tabview-nav { overflow-x: auto; max-width: 100%; }
+  .p-steps .p-steps-list { overflow-x: auto; }
+}
+@media (max-width: 480px) {
+  .p-paginator { font-size: 0.85rem; }
+  .p-paginator .p-paginator-pages .p-paginator-page { min-width: 2rem; height: 2rem; }
 }

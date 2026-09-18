@@ -42,7 +42,7 @@ interface DashboardData {
     </div>
 
     <!-- Error state -->
-    <p-message *ngIf="!loading && error" severity="error" styleClass="w-full mb-3"></p-message>
+    <p-message *ngIf="!loading && error" severity="error" [text]="error" styleClass="w-full mb-3"></p-message>
     <div *ngIf="!loading && error" class="flex align-items-center gap-2 mb-4">
       <span class="err-text">{{ error }}</span>
       <p-button label="Retry" icon="pi pi-refresh" severity="secondary" [outlined]="true" size="small" (onClick)="load()"></p-button>
@@ -166,9 +166,14 @@ export class DashboardComponent implements OnInit {
 
   private updateVerification() {
     const v = this.data?.verification;
-    // Backend embeds verification; default to verified (no banner) if missing
-    const emailVerified = v?.emailVerified !== false;
-    const mobileVerified = v?.mobileVerified !== false;
+    // Missing verification object → show banner (fail-closed) rather than hiding it.
+    if (!v) {
+      this.showVerifyBanner = true;
+      this.verificationHint = 'Please verify your email and mobile in Profile.';
+      return;
+    }
+    const emailVerified = v.emailVerified === true;
+    const mobileVerified = v.mobileVerified === true;
     this.showVerifyBanner = !emailVerified || !mobileVerified;
     if (!emailVerified && !mobileVerified) this.verificationHint = 'Your email and mobile are unverified.';
     else if (!emailVerified) this.verificationHint = 'Your email is unverified.';

@@ -14,20 +14,24 @@ export class ErrorHandlerService {
   private messageService = inject(MessageService);
 
   handleError(error: unknown, context?: string): ApiError {
+    const wasHttp = error instanceof HttpErrorResponse;
     const apiError = this.normalizeError(error);
-    
-    const displayMessage = context ? `${context}: ${apiError.message}` : apiError.message;
-    
-    this.messageService.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: displayMessage,
-      life: 5000,
-      closable: true,
-    });
+
+    // normalizeError -> handleHttpError already toasted for HTTP errors. Avoid double toast.
+    if (!wasHttp) {
+      const displayMessage = context ? `${context}: ${apiError.message}` : apiError.message;
+
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: displayMessage,
+        life: 5000,
+        closable: true,
+      });
+    }
 
     console.error(`[ErrorHandler] ${context ?? 'Global'}`, error);
-    
+
     return apiError;
   }
 
